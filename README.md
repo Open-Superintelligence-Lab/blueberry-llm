@@ -38,25 +38,21 @@ This is an **open research project** - we encourage everyone to fork the project
 ## Engineering Questions
 - Should we make it auto detect number and type of GPUs?
 
-## 🔍 Advanced GPU Profiler
+## 🔍 Simple GPU Profiler
 
-Blueberry LLM includes a comprehensive **Advanced GPU Profiler** for performance optimization:
+Blueberry LLM includes a **Simple GPU Profiler** for core performance measurements:
 
-- **Memory allocation tracking** - Monitor GPU memory usage and fragmentation
-- **Kernel execution profiling** - Track CUDA kernel performance
-- **Data movement analysis** - Monitor bandwidth utilization
+- **Memory allocation tracking** - Monitor GPU memory usage
+- **Kernel execution profiling** - Track CUDA kernel performance  
 - **Expert routing efficiency** - Analyze MoE load balancing
 
 ### Quick Profiling
 ```bash
-# Train with profiling enabled
-python examples/train_with_profiler.py
-
-# Test profiler functionality  
-python tests/test_profiler.py
+# Demo the simple profiler
+python examples/simple_profiler_demo.py
 ```
 
-See [docs/PROFILER_README.md](docs/PROFILER_README.md) for comprehensive documentation.
+The profiler generates reports in `profiler_output/` directory.
 
 ## Future Project
 

@@ -2,9 +2,3 @@ datasets
 transformers
 torchtune
 torchao
-
-# Advanced GPU Profiler dependencies (optional)
-nvidia-ml-py3>=7.352.0
-psutil>=5.8.0
-matplotlib>=3.5.0
-pandas>=1.3.0
