@@ -83,6 +83,16 @@ def run_single_experiment(config: MoEModelConfig) -> Tuple[MoEMinimalLLM, Dict[s
     optim = torch.optim.AdamW(model.parameters(), lr=config.muon_lr * 0.1)
     steps = 0
     tokens_per_step = config.batch_size * config.max_seq_len
+    # Aux loss aggregation
+    aux_sum: float = 0.0
+    aux_count: int = 0
+    # Peak memory (CUDA only)
+    peak_mem_bytes: int = 0
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.reset_peak_memory_stats()
+        except Exception:
+            pass
     for x, y in train_loader:
         if steps >= config.max_steps:
             break
@@ -97,10 +107,18 @@ def run_single_experiment(config: MoEModelConfig) -> Tuple[MoEMinimalLLM, Dict[s
         torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
         optim.step()
         steps += 1
+        if aux_loss is not None:
+            aux_sum += float(aux_loss.detach().item())
+            aux_count += 1
 
     wall_s = time.time() - start_t
     tokens_seen = steps * tokens_per_step
     tps = tokens_seen / max(1e-6, wall_s)
+    if torch.cuda.is_available():
+        try:
+            peak_mem_bytes = int(torch.cuda.max_memory_allocated())
+        except Exception:
+            peak_mem_bytes = 0
 
     # Final eval
     final = evaluate_model(model, val_loader, config)
@@ -119,9 +137,10 @@ def run_single_experiment(config: MoEModelConfig) -> Tuple[MoEMinimalLLM, Dict[s
         "wall_time_s": wall_s,
         "tokens_seen": tokens_seen,
         "tokens_per_second": tps,
+        "peak_mem_bytes": peak_mem_bytes,
+        "train_aux_loss_mean": (aux_sum / aux_count) if aux_count > 0 else None,
     }
     metrics.update(final)
     metrics.update(asdict(config))  # include config fields (safe dataclass fields)
     metrics.update(_gather_router_stats(model))
     return model, metrics
-
