@@ -116,13 +116,18 @@ def profile_router_forward(profiler: SimpleGPUProfiler):
                 
                 # Profile expert routing
                 if isinstance(result, tuple) and len(result) >= 2:
-                    expert_indices, token_count = result[0], result[1]
-                    if isinstance(expert_indices, torch.Tensor):
-                        expert_indices = expert_indices.tolist()
-                    if isinstance(token_count, torch.Tensor):
-                        token_count = token_count.item()
+                    # Router returns (router_weights, expert_indices, router_probs)
+                    router_weights, expert_indices, router_probs = result
                     
-                    profiler.profile_expert_routing(expert_indices, token_count)
+                    if isinstance(expert_indices, torch.Tensor):
+                        # expert_indices shape: [batch_size, seq_len, top_k]
+                        batch_size, seq_len, top_k = expert_indices.shape
+                        token_count = batch_size * seq_len
+                        
+                        # Flatten expert indices for profiling
+                        expert_indices_flat = expert_indices.flatten().tolist()
+                        
+                        profiler.profile_expert_routing(expert_indices_flat, token_count)
                 
                 return result
             else:

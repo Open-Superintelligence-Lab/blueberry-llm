@@ -139,9 +139,9 @@ class SimpleGPUProfiler:
         if not self.is_profiling:
             return
         
-        # Track expert usage
+        # Track expert usage - each expert index represents one routing decision
         for expert_id in expert_indices:
-            self.expert_usage[expert_id] += token_count
+            self.expert_usage[expert_id] += 1
         self.total_tokens += token_count
         
         # Calculate load balance score (lower is better)
