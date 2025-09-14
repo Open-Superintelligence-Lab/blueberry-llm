@@ -21,6 +21,8 @@ import pickle
 from torchtune.modules import RotaryPositionalEmbeddings
 warnings.filterwarnings('ignore')
 
+# Profiler integration is handled externally via profiler_hooks.py
+
 def set_seed(seed: int = 42):
     """Set all random seeds for reproducibility"""
     random.seed(seed)
