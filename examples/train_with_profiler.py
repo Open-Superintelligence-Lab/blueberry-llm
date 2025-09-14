@@ -11,8 +11,11 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from auto_config import auto_configure
 from llm import train_moe_model, load_and_cache_data, TextTokenDataset, MoEModelConfig
-from advanced_gpu_profiler import AdvancedGPUProfiler
-from profiler_hooks import ProfilerContext, patch_model_for_profiling
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from profiler import AdvancedGPUProfiler, ProfilerContext, patch_model_for_profiling
 
 def train_with_profiling():
     """Train MoE model with comprehensive profiling"""

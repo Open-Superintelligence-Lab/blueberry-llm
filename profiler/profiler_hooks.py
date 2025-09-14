@@ -9,7 +9,7 @@ import torch.nn as nn
 import functools
 import time
 from typing import Optional, List, Any, Callable
-from advanced_gpu_profiler import AdvancedGPUProfiler
+from .advanced_gpu_profiler import AdvancedGPUProfiler
 
 class ProfilerHooks:
     """Clean profiler integration using hooks and decorators"""
@@ -183,7 +183,7 @@ def train_with_profiling(train_function: Callable, profiler: AdvancedGPUProfiler
 # Example usage functions
 def example_usage():
     """Example of clean profiler usage"""
-    from advanced_gpu_profiler import AdvancedGPUProfiler
+    from .advanced_gpu_profiler import AdvancedGPUProfiler
     
     # Create profiler
     profiler = AdvancedGPUProfiler(num_experts=8, enable_profiling=True)

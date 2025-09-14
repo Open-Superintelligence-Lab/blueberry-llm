@@ -14,6 +14,20 @@ chmod +x setup.sh
 python train_auto.py
 ```
 
+## 📁 Project Structure
+
+```
+blueberry-llm/
+├── 📄 Core Files (llm.py, train_auto.py, inference.py)
+├── 📊 profiler/          # Advanced GPU Profiler
+├── 🧪 tests/            # Test Suite  
+├── 📚 examples/          # Example Scripts
+├── 📖 docs/             # Documentation
+└── 🔧 Configuration     # requirements.txt, setup.sh
+```
+
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed organization.
+
 This is an **open research project** - we encourage everyone to fork the project, run experiments, and submit pull requests with improvements.
 
 ## Research Questions
@@ -23,6 +37,26 @@ This is an **open research project** - we encourage everyone to fork the project
 
 ## Engineering Questions
 - Should we make it auto detect number and type of GPUs?
+
+## 🔍 Advanced GPU Profiler
+
+Blueberry LLM includes a comprehensive **Advanced GPU Profiler** for performance optimization:
+
+- **Memory allocation tracking** - Monitor GPU memory usage and fragmentation
+- **Kernel execution profiling** - Track CUDA kernel performance
+- **Data movement analysis** - Monitor bandwidth utilization
+- **Expert routing efficiency** - Analyze MoE load balancing
+
+### Quick Profiling
+```bash
+# Train with profiling enabled
+python examples/train_with_profiler.py
+
+# Test profiler functionality  
+python tests/test_profiler.py
+```
+
+See [docs/PROFILER_README.md](docs/PROFILER_README.md) for comprehensive documentation.
 
 ## Future Project
 

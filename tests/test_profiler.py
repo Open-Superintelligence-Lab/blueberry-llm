@@ -12,8 +12,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import time
 import numpy as np
-from advanced_gpu_profiler import AdvancedGPUProfiler
-from profiler_hooks import ProfilerContext, profile_operation, set_profiler_hooks
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from profiler import AdvancedGPUProfiler, ProfilerContext, profile_operation, set_profiler_hooks
 
 # Simple test MoE components
 class SimpleExpert(nn.Module):
