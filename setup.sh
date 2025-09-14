@@ -16,9 +16,14 @@ echo "✅ Python found: $(python3 --version)"
 # echo "📦 Installing PyTorch..."
 # pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# Install other dependencies
-echo "📦 Installing other dependencies..."
-pip3 install -r requirements.txt
+# Install core dependencies first
+echo "📦 Installing core dependencies..."
+pip3 install datasets transformers torchtune torchao
+
+# Install profiler dependencies (optional)
+echo "📦 Installing profiler dependencies (optional)..."
+pip3 install psutil matplotlib pandas || echo "⚠️  Some profiler dependencies failed to install (optional)"
+pip3 install nvidia-ml-py3 || echo "⚠️  nvidia-ml-py3 failed to install (optional)"
 
 # Test installation
 echo "🧪 Testing installation..."
