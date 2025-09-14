@@ -18,7 +18,8 @@ import math
 from tqdm import tqdm
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add parent directory to path to import from root
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from profiler import AdvancedGPUProfiler, ProfilerContext, patch_model_for_profiling
 from llm import train_moe_model, load_and_cache_data, TextTokenDataset, MoEModelConfig, MoEMinimalLLM, setup_muon_optimizer, evaluate_model
