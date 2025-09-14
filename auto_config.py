@@ -5,6 +5,8 @@ Detects hardware and automatically configures optimal training setup
 """
 
 import torch
+import time
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 
@@ -38,12 +40,22 @@ class AutoConfig:
     profiler_sample_rate: float  # Fraction of steps to profile (0.0-1.0)
     profiler_start_step: int     # When to start profiling
     profiler_end_step: int        # When to stop profiling
+    
+    # Run identification
+    run_id: str                  # Unique identifier for this training run
+    run_timestamp: str           # Human-readable timestamp
 
 class BlueberryAutoConfigurator:
     """One class that does everything"""
     
     def __init__(self):
         self.config = self._detect_and_configure()
+    
+    def _generate_run_id(self) -> tuple[str, str]:
+        """Generate unique run ID and timestamp"""
+        run_id = str(uuid.uuid4())[:8]  # Short unique ID
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        return run_id, timestamp
     
     def _detect_and_configure(self) -> AutoConfig:
         """Main auto-configuration logic"""
@@ -86,6 +98,9 @@ class BlueberryAutoConfigurator:
         # Set training parameters
         gradient_accumulation_steps = max(1, 32 // config['batch_size'])
         
+        # Generate run identification
+        run_id, run_timestamp = self._generate_run_id()
+        
         return AutoConfig(
             num_gpus=num_gpus,
             gpu_memory_gb=gpu_memory_gb,
@@ -99,11 +114,16 @@ class BlueberryAutoConfigurator:
             enable_profiling=True,
             profiler_sample_rate=0.1,  # Profile 10% of steps
             profiler_start_step=100,   # Start after warmup
-            profiler_end_step=650      # Stop before final steps
+            profiler_end_step=650,     # Stop before final steps
+            run_id=run_id,
+            run_timestamp=run_timestamp
         )
     
     def _cpu_config(self) -> AutoConfig:
         """Minimal config for CPU-only systems"""
+        # Generate run identification
+        run_id, run_timestamp = self._generate_run_id()
+        
         return AutoConfig(
             num_gpus=0, gpu_memory_gb=0,
             d_model=128, n_layers=2, n_heads=4, d_ff=512, num_experts=2,
@@ -114,13 +134,17 @@ class BlueberryAutoConfigurator:
             enable_profiling=False,
             profiler_sample_rate=0.0,
             profiler_start_step=0,
-            profiler_end_step=0
+            profiler_end_step=0,
+            run_id=run_id,
+            run_timestamp=run_timestamp
         )
     
     def print_config(self):
         """Print detected configuration"""
         print("🫐 Blueberry LLM Auto-Configuration")
         print("=" * 50)
+        print(f"🆔 Run ID: {self.config.run_id}")
+        print(f"⏰ Started: {self.config.run_timestamp}")
         
         if self.config.num_gpus == 0:
             print("🖥️  Mode: CPU Training (Limited)")

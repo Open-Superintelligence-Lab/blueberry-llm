@@ -38,11 +38,13 @@ class ExpertStats:
 class SimpleGPUProfiler:
     """Simple GPU profiler with core measurements only"""
     
-    def __init__(self, num_experts: int = 8, enable_profiling: bool = True):
+    def __init__(self, num_experts: int = 8, enable_profiling: bool = True, run_id: str = None, run_timestamp: str = None):
         self.num_experts = num_experts
         self.enable_profiling = enable_profiling
         self.is_profiling = False
         self.start_time = 0.0
+        self.run_id = run_id or "unknown"
+        self.run_timestamp = run_timestamp or time.strftime("%Y%m%d_%H%M%S")
         
         # Core data storage
         self.memory_history: List[MemoryStats] = []
@@ -196,7 +198,9 @@ class SimpleGPUProfiler:
         
         # Prepare report data
         report = {
-            "timestamp": time.strftime("%Y%m%d_%H%M%S"),
+            "run_id": self.run_id,
+            "run_timestamp": self.run_timestamp,
+            "profiling_timestamp": time.strftime("%Y%m%d_%H%M%S"),
             "profiling_duration": time.time() - self.start_time if self.start_time else 0,
             "num_experts": self.num_experts,
             "stats": {
@@ -222,7 +226,7 @@ class SimpleGPUProfiler:
         }
         
         # Save report
-        filename = f"profiler_output/simple_report_{report['timestamp']}.json"
+        filename = f"profiler_output/run_{self.run_id}_{self.run_timestamp}_profiler_report.json"
         with open(filename, 'w') as f:
             json.dump(report, f, indent=2)
         

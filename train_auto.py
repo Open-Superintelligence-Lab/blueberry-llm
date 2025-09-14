@@ -128,7 +128,9 @@ def main():
         from profiler import SimpleGPUProfiler
         profiler = SimpleGPUProfiler(
             num_experts=model_config.num_experts,
-            enable_profiling=True
+            enable_profiling=True,
+            run_id=configurator.config.run_id,
+            run_timestamp=configurator.config.run_timestamp
         )
         # Add configuration attributes to profiler
         profiler.start_step = configurator.config.profiler_start_step
@@ -142,18 +144,59 @@ def main():
     
     # Save results
     print("\n💾 Saving model...")
+    model_filename = f"blueberry_model_run_{configurator.config.run_id}.pt"
     torch.save({
         'model_state_dict': model.state_dict(),
         'config': model_config,
         'auto_config': configurator.config,
         'tokenizer': tokenizer,
         'final_metrics': final_metrics
-    }, 'blueberry_model.pt')
+    }, model_filename)
+    
+    # Create run summary file
+    import json
+    os.makedirs("profiler_output", exist_ok=True)
+    run_summary = {
+        "run_id": configurator.config.run_id,
+        "run_timestamp": configurator.config.run_timestamp,
+        "model_filename": model_filename,
+        "hardware": {
+            "num_gpus": configurator.config.num_gpus,
+            "gpu_memory_gb": configurator.config.gpu_memory_gb,
+            "use_distributed": configurator.config.use_distributed,
+            "use_amp": configurator.config.use_amp
+        },
+        "model_config": {
+            "d_model": model_config.d_model,
+            "n_layers": model_config.n_layers,
+            "n_heads": model_config.n_heads,
+            "d_ff": model_config.d_ff,
+            "num_experts": model_config.num_experts,
+            "expert_top_k": model_config.expert_top_k,
+            "batch_size": model_config.batch_size,
+            "max_steps": model_config.max_steps,
+            "max_seq_len": model_config.max_seq_len
+        },
+        "profiling": {
+            "enabled": configurator.config.enable_profiling,
+            "sample_rate": configurator.config.profiler_sample_rate,
+            "start_step": configurator.config.profiler_start_step,
+            "end_step": configurator.config.profiler_end_step
+        },
+        "final_metrics": final_metrics
+    }
+    
+    summary_filename = f"profiler_output/run_{configurator.config.run_id}_{configurator.config.run_timestamp}_summary.json"
+    with open(summary_filename, 'w') as f:
+        json.dump(run_summary, f, indent=2)
+    
+    print(f"📋 Run summary saved: {summary_filename}")
     
     print("✅ Training complete!")
     print(f"   Final validation loss: {final_metrics['val_loss']:.4f}")
     print(f"   Final validation accuracy: {final_metrics['val_accuracy']:.4f}")
-    print(f"   Model saved as: blueberry_model.pt")
+    print(f"   Model saved as: {model_filename}")
+    print(f"   Run ID: {configurator.config.run_id}")
 
 if __name__ == "__main__":
     main()
