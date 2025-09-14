@@ -45,14 +45,19 @@ def profile_expert_forward(profiler: SimpleGPUProfiler):
     """Decorator to profile expert forward pass"""
     def decorator(func):
         @functools.wraps(func)
-        def wrapper(self, x, *args, **kwargs):
+        def wrapper(*args, **kwargs):
             if profiler.is_profiling:
-                # Profile expert input
-                profiler.profile_memory_allocation(
-                    x.numel() * x.element_size(),
-                    expert_id=getattr(self, 'expert_id', None),
-                    operation="expert_input"
-                )
+                # Get self and input tensor
+                self = args[0]
+                x = args[1] if len(args) > 1 else None
+                
+                if x is not None and isinstance(x, torch.Tensor):
+                    # Profile expert input
+                    profiler.profile_memory_allocation(
+                        x.numel() * x.element_size(),
+                        expert_id=getattr(self, 'expert_id', None),
+                        operation="expert_input"
+                    )
                 
                 # Start kernel profiling
                 kernel_context = profiler.start_kernel_profiling(
@@ -62,7 +67,7 @@ def profile_expert_forward(profiler: SimpleGPUProfiler):
                 )
                 
                 # Execute original function
-                result = func(self, x, *args, **kwargs)
+                result = func(*args, **kwargs)
                 
                 # End kernel profiling
                 kernel_time = profiler.end_kernel_profiling(kernel_context)
@@ -77,7 +82,7 @@ def profile_expert_forward(profiler: SimpleGPUProfiler):
                 
                 return result
             else:
-                return func(self, x, *args, **kwargs)
+                return func(*args, **kwargs)
         return wrapper
     return decorator
 
@@ -85,13 +90,17 @@ def profile_router_forward(profiler: SimpleGPUProfiler):
     """Decorator to profile router forward pass"""
     def decorator(func):
         @functools.wraps(func)
-        def wrapper(self, x, *args, **kwargs):
+        def wrapper(*args, **kwargs):
             if profiler.is_profiling:
-                # Profile router input
-                profiler.profile_memory_allocation(
-                    x.numel() * x.element_size(),
-                    operation="router_input"
-                )
+                # Get the input tensor (first argument after self)
+                x = args[1] if len(args) > 1 else None
+                
+                if x is not None and isinstance(x, torch.Tensor):
+                    # Profile router input
+                    profiler.profile_memory_allocation(
+                        x.numel() * x.element_size(),
+                        operation="router_input"
+                    )
                 
                 # Start kernel profiling
                 kernel_context = profiler.start_kernel_profiling(
@@ -100,7 +109,7 @@ def profile_router_forward(profiler: SimpleGPUProfiler):
                 )
                 
                 # Execute original function
-                result = func(self, x, *args, **kwargs)
+                result = func(*args, **kwargs)
                 
                 # End kernel profiling
                 kernel_time = profiler.end_kernel_profiling(kernel_context)
@@ -117,7 +126,7 @@ def profile_router_forward(profiler: SimpleGPUProfiler):
                 
                 return result
             else:
-                return func(self, x, *args, **kwargs)
+                return func(*args, **kwargs)
         return wrapper
     return decorator
 
