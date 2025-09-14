@@ -32,6 +32,12 @@ class AutoConfig:
     # Performance
     use_distributed: bool
     use_amp: bool
+    
+    # Profiling
+    enable_profiling: bool
+    profiler_sample_rate: float  # Fraction of steps to profile (0.0-1.0)
+    profiler_start_step: int     # When to start profiling
+    profiler_end_step: int        # When to stop profiling
 
 class BlueberryAutoConfigurator:
     """One class that does everything"""
@@ -88,7 +94,12 @@ class BlueberryAutoConfigurator:
             max_steps=5000,
             learning_rate=0.01,
             use_distributed=(num_gpus > 1),
-            use_amp=True
+            use_amp=True,
+            # Profiler settings - enable for GPU training
+            enable_profiling=True,
+            profiler_sample_rate=0.1,  # Profile 10% of steps
+            profiler_start_step=100,   # Start after warmup
+            profiler_end_step=4500     # Stop before final steps
         )
     
     def _cpu_config(self) -> AutoConfig:
@@ -98,7 +109,12 @@ class BlueberryAutoConfigurator:
             d_model=128, n_layers=2, n_heads=4, d_ff=512, num_experts=2,
             batch_size=4, gradient_accumulation_steps=8, max_steps=1000,
             learning_rate=0.001, max_seq_len=256,
-            use_distributed=False, use_amp=False
+            use_distributed=False, use_amp=False,
+            # Profiler settings - disabled for CPU training
+            enable_profiling=False,
+            profiler_sample_rate=0.0,
+            profiler_start_step=0,
+            profiler_end_step=0
         )
     
     def print_config(self):
@@ -121,6 +137,12 @@ class BlueberryAutoConfigurator:
         if self.config.use_distributed:
             print(f"🌐 Data Parallel: Yes (across {self.config.num_gpus} GPUs)")
             print(f"   Run with: torchrun --nproc_per_node={self.config.num_gpus} train_auto.py")
+        
+        if self.config.enable_profiling:
+            print(f"📊 Profiling: Enabled ({self.config.profiler_sample_rate*100:.0f}% sampling)")
+            print(f"   Steps: {self.config.profiler_start_step}-{self.config.profiler_end_step}")
+        else:
+            print("📊 Profiling: Disabled")
         
         print("=" * 50)
     

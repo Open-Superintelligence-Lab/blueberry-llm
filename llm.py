@@ -544,7 +544,7 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
     return [muon_optimizer, adamw_optimizer]
 
 
-def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader: DataLoader):
+def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader: DataLoader, profiler=None):
     """Train the MoE model"""
     print(f"\n🚀 Training MoE model with {config.num_experts} experts (top-{config.expert_top_k})")
 
@@ -553,6 +553,12 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     model = MoEMinimalLLM(config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
+    
+    # Apply profiler if provided
+    if profiler is not None:
+        from profiler import apply_simple_profiling
+        model = apply_simple_profiling(model, profiler)
+        print("📊 Profiler applied to model")
 
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
@@ -588,6 +594,10 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     model.train()
     step = 0
     pbar = tqdm(total=config.max_steps, desc="Training MoE")
+    
+    # Profiler state tracking
+    profiler_active = False
+    profiler_started = False
 
     while step < config.max_steps:
         for batch_idx, (x, y) in enumerate(train_loader):
@@ -669,6 +679,31 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                 print(f"\n🧪 Milestone {step}: Val Loss: {eval_metrics['val_loss']:.4f}")
 
             step += 1
+            
+            # Profiler control logic
+            if profiler is not None:
+                # Check if we should start profiling
+                if not profiler_started and hasattr(profiler, 'start_step') and step >= profiler.start_step:
+                    profiler.start_profiling()
+                    profiler_started = True
+                    profiler_active = True
+                    print(f"📊 Profiler started at step {step}")
+                
+                # Check if we should stop profiling
+                elif profiler_active and hasattr(profiler, 'end_step') and step >= profiler.end_step:
+                    profiler.stop_profiling()
+                    profiler_active = False
+                    print(f"📊 Profiler stopped at step {step}")
+                
+                # Sample-based profiling (if sample_rate is set)
+                elif profiler_active and hasattr(profiler, 'sample_rate'):
+                    import random
+                    if random.random() > profiler.sample_rate:
+                        # Temporarily disable profiling for this step
+                        profiler.is_profiling = False
+                    else:
+                        profiler.is_profiling = True
+            
             if step % 20 == 0:
                 pbar.update(20)
 

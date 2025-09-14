@@ -122,9 +122,23 @@ def main():
     
     print(f"   Dataset: {len(train_dataset)} train, {len(val_dataset)} val samples")
     
+    # Setup profiler if enabled
+    profiler = None
+    if configurator.config.enable_profiling:
+        from profiler import SimpleGPUProfiler
+        profiler = SimpleGPUProfiler(
+            num_experts=model_config.num_experts,
+            enable_profiling=True
+        )
+        # Add configuration attributes to profiler
+        profiler.start_step = configurator.config.profiler_start_step
+        profiler.end_step = configurator.config.profiler_end_step
+        profiler.sample_rate = configurator.config.profiler_sample_rate
+        print(f"📊 Profiler configured: {profiler.sample_rate*100:.0f}% sampling from step {profiler.start_step} to {profiler.end_step}")
+    
     # Train the model
     print("\n🚀 Starting training...")
-    model, final_metrics = train_moe_model(model_config, train_loader, val_loader)
+    model, final_metrics = train_moe_model(model_config, train_loader, val_loader, profiler)
     
     # Save results
     print("\n💾 Saving model...")
