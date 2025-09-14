@@ -192,6 +192,11 @@ def main():
     
     print(f"📋 Run summary saved: {summary_filename}")
     
+    # Stop profiler if it was active
+    if profiler and profiler.is_profiling:
+        profiler.stop_profiling()
+        print("📊 Profiler stopped and report generated")
+    
     print("✅ Training complete!")
     print(f"   Final validation loss: {final_metrics['val_loss']:.4f}")
     print(f"   Final validation accuracy: {final_metrics['val_accuracy']:.4f}")
