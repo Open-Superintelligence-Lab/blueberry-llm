@@ -68,6 +68,8 @@ class MoEModelConfig:
     num_experts: int = 8
     expert_top_k: int = 2
     load_balancing_weight: float = 0.01
+    # Diagnostics
+    collect_router_stats: bool = False
 
     def __post_init__(self):
         self.d_k = self.d_model // self.n_heads
@@ -295,12 +297,14 @@ class MixtureOfExperts(nn.Module):
         num_experts: int = 8,
         top_k: int = 2,
         dropout: float = 0.1,
-        load_balancing_weight: float = 0.01
+        load_balancing_weight: float = 0.01,
+        collect_stats: bool = False
     ):
         super().__init__()
         self.num_experts = num_experts
         self.top_k = top_k
         self.load_balancing_weight = load_balancing_weight
+        self.collect_stats = collect_stats
 
         # Create experts
         self.experts = nn.ModuleList([
@@ -309,6 +313,10 @@ class MixtureOfExperts(nn.Module):
 
         # Create router
         self.router = TopKRouter(d_model, num_experts, top_k)
+        # Stats buffers (CPU-side) for lightweight aggregation
+        self.register_buffer("stats_usage_counts", torch.zeros(num_experts, dtype=torch.float32), persistent=False)
+        self.stats_entropy_sum: float = 0.0
+        self.stats_steps: int = 0
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
@@ -323,6 +331,17 @@ class MixtureOfExperts(nn.Module):
 
         # Get routing decisions
         router_weights, expert_indices, router_probs = self.router(x)
+
+        # Optional: collect simple router usage and entropy stats without affecting graph
+        if self.collect_stats:
+            with torch.no_grad():
+                # Entropy over experts, mean over tokens
+                entropy = -(router_probs * (router_probs + 1e-8).log()).sum(dim=-1).mean().item()
+                self.stats_entropy_sum += float(entropy)
+                self.stats_steps += 1
+                # Usage counts via top-k assignments
+                counts = torch.bincount(expert_indices.reshape(-1).to(torch.int64), minlength=self.num_experts)
+                self.stats_usage_counts += counts.to(self.stats_usage_counts.device, dtype=self.stats_usage_counts.dtype)
 
         # Initialize output tensor
         output = torch.zeros_like(x)
@@ -399,7 +418,8 @@ class MoETransformerBlock(nn.Module):
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(
-            d_model, d_ff, num_experts, top_k, dropout
+            d_model, d_ff, num_experts, top_k, dropout,
+            collect_stats=False
         )
 
         # Normalization layers
@@ -429,18 +449,20 @@ class MoEMinimalLLM(nn.Module):
         self.position_dropout = nn.Dropout(config.dropout)
 
         # Transformer blocks with MoE
-        self.transformer_blocks = nn.ModuleList([
-            MoETransformerBlock(
+        self.transformer_blocks = nn.ModuleList([])
+        for _ in range(config.n_layers):
+            block = MoETransformerBlock(
                 config.d_model,
                 config.n_heads,
                 config.d_ff,
                 config.max_seq_len,
                 config.num_experts,
                 config.expert_top_k,
-                config.dropout
+                config.dropout,
             )
-            for i in range(config.n_layers)
-        ])
+            # Propagate router stats collection flag down to MoE layer
+            block.feed_forward.collect_stats = bool(getattr(config, "collect_router_stats", False))
+            self.transformer_blocks.append(block)
 
         # Output layers
         self.norm = nn.RMSNorm(config.d_model)
