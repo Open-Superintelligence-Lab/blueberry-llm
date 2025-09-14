@@ -94,31 +94,43 @@ class SimpleGPUProfiler:
         
         self.memory_history.append(stats)
     
-    def profile_kernel_execution(self, kernel_name: str, expert_id: Optional[int] = None, operation_type: str = ""):
-        """Profile kernel execution time"""
+    def start_kernel_profiling(self, kernel_name: str, expert_id: Optional[int] = None, operation_type: str = ""):
+        """Start profiling a kernel execution"""
         if not self.is_profiling or not torch.cuda.is_available():
-            return 0.0
+            return None
         
         start_event = torch.cuda.Event(enable_timing=True)
-        end_event = torch.cuda.Event(enable_timing=True)
-        
         start_event.record()
-        # Kernel execution happens here
+        
+        return {
+            'start_event': start_event,
+            'kernel_name': kernel_name,
+            'expert_id': expert_id,
+            'operation_type': operation_type,
+            'start_time': time.time() - self.start_time
+        }
+    
+    def end_kernel_profiling(self, profiling_context):
+        """End profiling a kernel execution"""
+        if profiling_context is None or not self.is_profiling or not torch.cuda.is_available():
+            return 0.0
+        
+        end_event = torch.cuda.Event(enable_timing=True)
         end_event.record()
         torch.cuda.synchronize()
         
-        execution_time_ms = start_event.elapsed_time(end_event)
+        execution_time_ms = profiling_context['start_event'].elapsed_time(end_event)
         
         stats = KernelStats(
-            timestamp=time.time() - self.start_time,
-            kernel_name=kernel_name,
+            timestamp=profiling_context['start_time'],
+            kernel_name=profiling_context['kernel_name'],
             execution_time_ms=execution_time_ms,
-            expert_id=expert_id,
-            operation_type=operation_type
+            expert_id=profiling_context['expert_id'],
+            operation_type=profiling_context['operation_type']
         )
         
         self.kernel_history.append(stats)
-        self.kernel_times[kernel_name].append(execution_time_ms)
+        self.kernel_times[profiling_context['kernel_name']].append(execution_time_ms)
         
         return execution_time_ms
     

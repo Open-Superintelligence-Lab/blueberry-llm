@@ -106,15 +106,15 @@ class BlueberryAutoConfigurator:
             gpu_memory_gb=gpu_memory_gb,
             **config,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            max_steps=700,
+            max_steps=100,
             learning_rate=0.01,
             use_distributed=(num_gpus > 1),
             use_amp=True,
             # Profiler settings - enable for GPU training
             enable_profiling=True,
-            profiler_sample_rate=0.1,  # Profile 10% of steps
-            profiler_start_step=100,   # Start after warmup
-            profiler_end_step=650,     # Stop before final steps
+            profiler_sample_rate=0.5,  # Profile 50% of steps for quick test
+            profiler_start_step=10,    # Start early for quick test
+            profiler_end_step=90,      # Stop before final steps
             run_id=run_id,
             run_timestamp=run_timestamp
         )
@@ -127,7 +127,7 @@ class BlueberryAutoConfigurator:
         return AutoConfig(
             num_gpus=0, gpu_memory_gb=0,
             d_model=128, n_layers=2, n_heads=4, d_ff=512, num_experts=2,
-            batch_size=4, gradient_accumulation_steps=8, max_steps=700,
+            batch_size=4, gradient_accumulation_steps=8, max_steps=100,
             learning_rate=0.001, max_seq_len=256,
             use_distributed=False, use_amp=False,
             # Profiler settings - disabled for CPU training

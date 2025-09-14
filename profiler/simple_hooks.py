@@ -54,8 +54,8 @@ def profile_expert_forward(profiler: SimpleGPUProfiler):
                     operation="expert_input"
                 )
                 
-                # Profile kernel execution
-                kernel_time = profiler.profile_kernel_execution(
+                # Start kernel profiling
+                kernel_context = profiler.start_kernel_profiling(
                     f"expert_{getattr(self, 'expert_id', 'unknown')}",
                     expert_id=getattr(self, 'expert_id', None),
                     operation_type="expert_forward"
@@ -63,6 +63,9 @@ def profile_expert_forward(profiler: SimpleGPUProfiler):
                 
                 # Execute original function
                 result = func(self, x, *args, **kwargs)
+                
+                # End kernel profiling
+                kernel_time = profiler.end_kernel_profiling(kernel_context)
                 
                 # Profile expert output
                 if isinstance(result, torch.Tensor):
@@ -90,14 +93,17 @@ def profile_router_forward(profiler: SimpleGPUProfiler):
                     operation="router_input"
                 )
                 
-                # Profile kernel execution
-                kernel_time = profiler.profile_kernel_execution(
+                # Start kernel profiling
+                kernel_context = profiler.start_kernel_profiling(
                     "router_forward",
                     operation_type="routing"
                 )
                 
                 # Execute original function
                 result = func(self, x, *args, **kwargs)
+                
+                # End kernel profiling
+                kernel_time = profiler.end_kernel_profiling(kernel_context)
                 
                 # Profile expert routing
                 if isinstance(result, tuple) and len(result) >= 2:
@@ -117,8 +123,7 @@ def profile_router_forward(profiler: SimpleGPUProfiler):
 
 def apply_simple_profiling(model, profiler: SimpleGPUProfiler):
     """Apply simple profiling to a model"""
-    if not profiler.is_profiling:
-        return model
+    # Always apply hooks - they will only execute when profiler.is_profiling is True
     
     # Profile main model forward pass
     if hasattr(model, 'forward'):
