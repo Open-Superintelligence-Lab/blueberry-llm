@@ -1,0 +1,24 @@
+site_name: Blueberry LLM Research
+site_url: 
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - content.code.annotate
+    - content.tooltips
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed
+plugins:
+  - search
+nav:
+  - Home: index.md
+  - Experiments: experiments.md
+  - Usage: usage.md
+  - Plots: plots.md
+

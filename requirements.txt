@@ -2,3 +2,9 @@ datasets
 transformers
 torchtune
 torchao
+numpy
+pandas
+matplotlib
+seaborn
+mkdocs
+mkdocs-material
