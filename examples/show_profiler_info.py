@@ -124,27 +124,29 @@ def show_live_profiler_demo():
     # Create a simple profiler demo
     profiler = AdvancedGPUProfiler(num_experts=4, enable_profiling=True)
     
-    with profiler.start_profiling():
-        print("🚀 Simulating MoE operations...")
-        
-        # Simulate some operations
-        for i in range(5):
-            # Simulate memory allocation
-            size_bytes = (i + 1) * 1024 * 1024  # 1MB, 2MB, 3MB, 4MB, 5MB
-            profiler.profile_memory_allocation(size_bytes, expert_id=i % 4, operation=f"demo_alloc_{i}")
-            
-            # Simulate kernel execution
-            profiler.profile_kernel_execution(f"demo_kernel_{i}", expert_id=i % 4, operation_type="demo")
-            
-            # Simulate expert routing
-            expert_indices = [i % 4, (i + 1) % 4]
-            token_count = 16
-            profiler.profile_expert_routing(expert_indices, token_count)
-        
-        # Show dashboard
-        print(f"\n📊 LIVE PROFILER DASHBOARD:")
-        profiler.print_dashboard()
+    # Start profiling
+    profiler.start_profiling()
+    print("🚀 Simulating MoE operations...")
     
+    # Simulate some operations
+    for i in range(5):
+        # Simulate memory allocation
+        size_bytes = (i + 1) * 1024 * 1024  # 1MB, 2MB, 3MB, 4MB, 5MB
+        profiler.profile_memory_allocation(size_bytes, expert_id=i % 4, operation=f"demo_alloc_{i}")
+        
+        # Simulate kernel execution
+        profiler.profile_kernel_execution(f"demo_kernel_{i}", expert_id=i % 4, operation_type="demo")
+        
+        # Simulate expert routing
+        expert_indices = [i % 4, (i + 1) % 4]
+        token_count = 16
+        profiler.profile_expert_routing(expert_indices, token_count)
+    
+    # Show dashboard
+    print(f"\n📊 LIVE PROFILER DASHBOARD:")
+    profiler.print_dashboard()
+    
+    # Stop profiling
     profiler.stop_profiling()
 
 if __name__ == "__main__":

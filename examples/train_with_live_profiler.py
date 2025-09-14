@@ -90,72 +90,64 @@ def train_with_live_profiler():
     print(f"   Output directory: profiler_output/")
     
     # Train with LIVE profiling
-    with ProfilerContext(profiler) as p:
-        print(f"\n🚀 Starting training with LIVE profiling...")
+    print(f"\n🚀 Starting training with LIVE profiling...")
+    
+    # Start profiling
+    profiler.start_profiling()
+    
+    # Initialize model
+    model = MoEMinimalLLM(model_config)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
+    
+    # Patch model for automatic profiling
+    patched_model = patch_model_for_profiling(model, profiler)
+    
+    # Count parameters
+    total_params = sum(param.numel() for param in model.parameters())
+    active_params = sum(param.numel() for name, param in model.named_parameters()
+                       if 'expert' not in name)
+    expert_params = total_params - active_params
+    
+    print(f"  📊 Total parameters: {total_params:,}")
+    print(f"  📊 Active parameters: {active_params:,}")
+    print(f"  📊 Expert parameters: {expert_params:,}")
+    print(f"  📊 Parameter efficiency: {active_params/total_params:.1%} active per forward pass")
+    
+    # Setup optimizers
+    optimizers = setup_muon_optimizer(model, model_config)
+    
+    # Learning rate schedule
+    schedulers = []
+    for optimizer in optimizers:
+        warmup_steps = model_config.max_steps // 20
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return step / warmup_steps
+            else:
+                progress = (step - warmup_steps) / (model_config.max_steps - warmup_steps)
+                return 0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * progress))
         
-        # Initialize model
-        model = MoEMinimalLLM(model_config)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = model.to(device)
-        
-        # Patch model for automatic profiling
-        patched_model = patch_model_for_profiling(model, p)
-        
-        # Count parameters
-        total_params = sum(param.numel() for param in model.parameters())
-        active_params = sum(param.numel() for name, param in model.named_parameters()
-                           if 'expert' not in name)
-        expert_params = total_params - active_params
-        
-        print(f"  📊 Total parameters: {total_params:,}")
-        print(f"  📊 Active parameters: {active_params:,}")
-        print(f"  📊 Expert parameters: {expert_params:,}")
-        print(f"  📊 Parameter efficiency: {active_params/total_params:.1%} active per forward pass")
-        
-        # Setup optimizers
-        optimizers = setup_muon_optimizer(model, model_config)
-        
-        # Learning rate schedule
-        schedulers = []
-        for optimizer in optimizers:
-            warmup_steps = model_config.max_steps // 20
-            def lr_lambda(step):
-                if step < warmup_steps:
-                    return step / warmup_steps
-                else:
-                    progress = (step - warmup_steps) / (model_config.max_steps - warmup_steps)
-                    return 0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * progress))
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+        schedulers.append(scheduler)
+    
+    scaler = GradScaler() if model_config.use_amp else None
+    
+    # Training loop with LIVE profiling
+    patched_model.train()
+    step = 0
+    pbar = tqdm(total=model_config.max_steps, desc="Training MoE with LIVE Profiler")
+    
+    while step < model_config.max_steps:
+        for batch_idx, (x, y) in enumerate(train_loader):
+            if step >= model_config.max_steps:
+                break
             
-            scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-            schedulers.append(scheduler)
-        
-        scaler = GradScaler() if model_config.use_amp else None
-        
-        # Training loop with LIVE profiling
-        patched_model.train()
-        step = 0
-        pbar = tqdm(total=model_config.max_steps, desc="Training MoE with LIVE Profiler")
-        
-        while step < model_config.max_steps:
-            for batch_idx, (x, y) in enumerate(train_loader):
-                if step >= model_config.max_steps:
-                    break
-                
-                x, y = x.to(device), y.to(device)
-                
-                # Forward pass
-                if model_config.use_amp:
-                    with autocast():
-                        logits, aux_loss = patched_model(x, return_aux_loss=True)
-                        ce_loss = F.cross_entropy(logits.view(-1, model_config.vocab_size), y.view(-1))
-                        
-                        total_loss = ce_loss
-                        if aux_loss is not None:
-                            total_loss = total_loss + aux_loss
-                        
-                        loss = total_loss / model_config.gradient_accumulation_steps
-                    scaler.scale(loss).backward()
-                else:
+            x, y = x.to(device), y.to(device)
+            
+            # Forward pass
+            if model_config.use_amp:
+                with autocast():
                     logits, aux_loss = patched_model(x, return_aux_loss=True)
                     ce_loss = F.cross_entropy(logits.view(-1, model_config.vocab_size), y.view(-1))
                     
@@ -164,75 +156,88 @@ def train_with_live_profiler():
                         total_loss = total_loss + aux_loss
                     
                     loss = total_loss / model_config.gradient_accumulation_steps
-                    loss.backward()
+                scaler.scale(loss).backward()
+            else:
+                logits, aux_loss = patched_model(x, return_aux_loss=True)
+                ce_loss = F.cross_entropy(logits.view(-1, model_config.vocab_size), y.view(-1))
                 
-                # Optimizer step
-                if (step + 1) % model_config.gradient_accumulation_steps == 0:
-                    if model_config.use_amp:
-                        for optimizer in optimizers:
-                            scaler.unscale_(optimizer)
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), model_config.grad_clip)
-                        
-                        for optimizer in optimizers:
-                            scaler.step(optimizer)
-                            optimizer.zero_grad()
-                        for scheduler in schedulers:
-                            scheduler.step()
-                        scaler.update()
-                    else:
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), model_config.grad_clip)
-                        for optimizer in optimizers:
-                            optimizer.step()
-                            optimizer.zero_grad()
-                        for scheduler in schedulers:
-                            scheduler.step()
+                total_loss = ce_loss
+                if aux_loss is not None:
+                    total_loss = total_loss + aux_loss
                 
-                # LIVE Profiler Dashboard every 100 steps
-                if step % 100 == 0 and step > 0:
-                    print(f"\n{'='*60}")
-                    print(f"📊 LIVE PROFILER DASHBOARD - Step {step}")
-                    print(f"{'='*60}")
-                    p.print_dashboard()
-                    print(f"{'='*60}")
-                
-                # Logging
-                if step % 100 == 0:
-                    with torch.no_grad():
-                        predictions = logits.argmax(dim=-1)
-                        accuracy = (predictions == y).float().mean().item()
-                        current_loss = ce_loss.item()
-                        perplexity = math.exp(min(current_loss, 20))
+                loss = total_loss / model_config.gradient_accumulation_steps
+                loss.backward()
+            
+            # Optimizer step
+            if (step + 1) % model_config.gradient_accumulation_steps == 0:
+                if model_config.use_amp:
+                    for optimizer in optimizers:
+                        scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), model_config.grad_clip)
                     
-                    pbar.set_postfix({
-                        'loss': f'{current_loss:.4f}',
-                        'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
-                        'acc': f'{accuracy:.3f}',
-                        'ppl': f'{perplexity:.1f}'
-                    })
+                    for optimizer in optimizers:
+                        scaler.step(optimizer)
+                        optimizer.zero_grad()
+                    for scheduler in schedulers:
+                        scheduler.step()
+                    scaler.update()
+                else:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), model_config.grad_clip)
+                    for optimizer in optimizers:
+                        optimizer.step()
+                        optimizer.zero_grad()
+                    for scheduler in schedulers:
+                        scheduler.step()
+            
+            # LIVE Profiler Dashboard every 100 steps
+            if step % 100 == 0 and step > 0:
+                print(f"\n{'='*60}")
+                print(f"📊 LIVE PROFILER DASHBOARD - Step {step}")
+                print(f"{'='*60}")
+                profiler.print_dashboard()
+                print(f"{'='*60}")
+            
+            # Logging
+            if step % 100 == 0:
+                with torch.no_grad():
+                    predictions = logits.argmax(dim=-1)
+                    accuracy = (predictions == y).float().mean().item()
+                    current_loss = ce_loss.item()
+                    perplexity = math.exp(min(current_loss, 20))
                 
-                # Evaluation
-                if step % model_config.eval_every == 0 and step > 0:
-                    eval_metrics = evaluate_model(model, val_loader, model_config)
-                    print(f"\nStep {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
-                          f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
-                          f"Val PPL: {eval_metrics['val_perplexity']:.2f}")
-                
-                step += 1
-                if step % 20 == 0:
-                    pbar.update(20)
-        
-        pbar.close()
-        
-        # Final evaluation
-        final_eval = evaluate_model(model, val_loader, model_config)
-        print(f"\n📊 Final Results:")
-        print(f"   Val Loss: {final_eval['val_loss']:.4f}")
-        print(f"   Val Accuracy: {final_eval['val_accuracy']:.4f}")
-        print(f"   Val Perplexity: {final_eval['val_perplexity']:.2f}")
-        
-        # Final profiling dashboard
-        print(f"\n📊 FINAL PROFILER DASHBOARD:")
-        p.print_dashboard()
+                pbar.set_postfix({
+                    'loss': f'{current_loss:.4f}',
+                    'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
+                    'acc': f'{accuracy:.3f}',
+                    'ppl': f'{perplexity:.1f}'
+                })
+            
+            # Evaluation
+            if step % model_config.eval_every == 0 and step > 0:
+                eval_metrics = evaluate_model(model, val_loader, model_config)
+                print(f"\nStep {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
+                      f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
+                      f"Val PPL: {eval_metrics['val_perplexity']:.2f}")
+            
+            step += 1
+            if step % 20 == 0:
+                pbar.update(20)
+    
+    pbar.close()
+    
+    # Final evaluation
+    final_eval = evaluate_model(model, val_loader, model_config)
+    print(f"\n📊 Final Results:")
+    print(f"   Val Loss: {final_eval['val_loss']:.4f}")
+    print(f"   Val Accuracy: {final_eval['val_accuracy']:.4f}")
+    print(f"   Val Perplexity: {final_eval['val_perplexity']:.2f}")
+    
+    # Final profiling dashboard
+    print(f"\n📊 FINAL PROFILER DASHBOARD:")
+    profiler.print_dashboard()
+    
+    # Stop profiling
+    profiler.stop_profiling()
     
     # Save model with profiling metadata
     print(f"\n💾 Saving model...")
