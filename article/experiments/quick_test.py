@@ -6,12 +6,20 @@ Quick 10-step test to verify all experiments work before running full experiment
 import os
 import sys
 
-# Add parent directory to path
+# Add parent directories to path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
+parent_dir = os.path.dirname(current_dir)  # article/
+project_root = os.path.dirname(parent_dir)  # blueberry-llm/
+sys.path.insert(0, project_root)
 
-from amp_experiment_runner import AMPExperimentRunner
+try:
+    from amp_experiment_runner import AMPExperimentRunner
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Python path: {sys.path}")
+    print("Make sure you're running from the blueberry-llm project root directory")
+    raise
 
 def main():
     """Run quick test of all experiment configurations"""

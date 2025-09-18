@@ -14,16 +14,24 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Tuple, Optional
 
-# Add parent directory to path
+# Add parent directories to path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
+parent_dir = os.path.dirname(current_dir)  # article/
+project_root = os.path.dirname(parent_dir)  # blueberry-llm/
+sys.path.insert(0, project_root)
 
-from core.auto_config import AutoConfig
-from legacy.llm import train_moe_model, MoEModelConfig
-from torch.utils.data import DataLoader, random_split
-from data.loader import load_and_cache_data
-from data.dataset import TextTokenDataset
+try:
+    from core.auto_config import AutoConfig
+    from legacy.llm import train_moe_model, MoEModelConfig
+    from torch.utils.data import DataLoader, random_split
+    from data.loader import load_and_cache_data
+    from data.dataset import TextTokenDataset
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Python path: {sys.path}")
+    print("Make sure you're running from the blueberry-llm project root directory")
+    raise
 
 @dataclass
 class ExperimentConfig:

@@ -6,11 +6,13 @@ Copy and paste this into a Colab cell to run the experiments
 
 # Cell 1: Setup and Installation
 """
-# Install required packages
-!pip install matplotlib seaborn pandas
+# First, upload the blueberry-llm repository to Colab
+# You can either:
+# 1. Upload the entire blueberry-llm folder to Colab
+# 2. Clone from GitHub: !git clone https://github.com/Open-Superintelligence-Lab/blueberry-llm.git
 
-# Clone or upload the blueberry-llm repository
-# If using Colab, upload the repository files or clone from GitHub
+# Then run the setup script
+!python blueberry-llm/article/experiments/setup_colab.py
 """
 
 # Cell 2: Import and Setup
@@ -32,32 +34,18 @@ sys.path.append('/content/blueberry-llm/article/experiments')
 
 # Cell 3: Quick Test (10 steps each)
 """
+# Change to the project root directory
+import os
+os.chdir('/content/blueberry-llm')
+
 # Run quick test to verify everything works
-from quick_test import main as run_quick_test
-
-print("🧪 Running quick test (10 steps per experiment)...")
-success = run_quick_test()
-
-if success:
-    print("✅ Quick test passed! Ready for full experiments.")
-else:
-    print("❌ Quick test failed. Check errors above.")
+!python article/experiments/quick_test.py
 """
 
 # Cell 4: Full Experiments (1000 steps each)
 """
 # Run full experiments
-from amp_experiment_runner import AMPExperimentRunner
-
-print("🚀 Running full experiments (1000 steps per experiment)...")
-print("This will take approximately 30-60 minutes depending on your GPU.")
-
-runner = AMPExperimentRunner(test_mode=False)
-results = runner.run_all_experiments()
-
-# Save results
-results_file = runner.save_results()
-runner.print_summary()
+!python article/experiments/amp_experiment_runner.py --full
 """
 
 # Cell 5: Analyze Results
