@@ -36,15 +36,17 @@ except ImportError as e:
 @dataclass
 class ExperimentConfig:
     """Configuration for a single experiment"""
-    # Model parameters
+    # Model parameters (required)
     d_model: int
     n_layers: int
+    batch_size: int
+    
+    # Model parameters (optional)
     n_heads: int = 8
     d_ff: int = None
     num_experts: int = 8
     
     # Training parameters
-    batch_size: int
     max_steps: int = 1000
     gradient_accumulation_steps: int = 1
     learning_rate: float = 0.01
