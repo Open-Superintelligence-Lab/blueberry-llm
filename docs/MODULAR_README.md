@@ -170,7 +170,7 @@ optimizers = setup_optimizers(model, config)  # Muon + AdamW
 
 # Advanced features
 muon = MuonWithWarmup(params, momentum_warmup_steps=1000)  # Momentum warmup
-scheduler = get_lr_scheduler(optimizer, config, "cosine_warmup")  # Smart scheduling
+scheduler = get_lr_scheduler(optimizer, config, "deepseek_warmup")  # Smart scheduling
 ```
 
 **Key Features**:
