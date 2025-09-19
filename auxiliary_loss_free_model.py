@@ -72,6 +72,7 @@ class ModelArgs:
     n_limited_groups: int = 1
     score_func: Literal["softmax", "sigmoid"] = "softmax"
     route_scale: float = 1.
+    dynamic_gate: bool = False
     # mla
     q_lora_rank: int = 0
     kv_lora_rank: int = 512
@@ -350,55 +351,72 @@ class MLP(nn.Module):
 
 class Gate(nn.Module):
     """
-    Auxiliary Loss-Free Gating mechanism for routing inputs in a mixture-of-experts (MoE) model.
-    
-    This implementation is "auxiliary loss free" - it does not compute or return any auxiliary
-    loss terms like load balancing loss that are commonly used in MoE models. The gate simply
-    computes routing weights and expert indices without any additional loss computation.
+    Gating mechanism for routing inputs in a mixture-of-experts (MoE) model.
+    Supports both a static, learnable bias and a dynamic, load-balancing bias inspired by DeepSeek.
     """
     def __init__(self, args: ModelArgs):
         super().__init__()
         self.dim = args.dim
+        self.n_routed_experts = args.n_routed_experts
         self.topk = args.n_activated_experts
         self.n_groups = args.n_expert_groups
         self.topk_groups = args.n_limited_groups
         self.score_func = args.score_func
         self.route_scale = args.route_scale
+        self.dynamic_gate = args.dynamic_gate
+
         self.weight = nn.Parameter(torch.empty(args.n_routed_experts, args.dim))
-        self.bias = nn.Parameter(torch.empty(args.n_routed_experts, dtype=torch.float32)) if self.dim == 7168 else None
+
+        if self.dynamic_gate:
+            self.register_buffer("expert_counts", torch.zeros(self.n_routed_experts))
+        else:
+            self.bias = nn.Parameter(torch.empty(args.n_routed_experts, dtype=torch.float32)) if self.dim == 7168 else None
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass for the auxiliary loss-free gating mechanism.
+        Forward pass for the gating mechanism.
 
         Args:
             x (torch.Tensor): Input tensor.
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Routing weights and selected expert indices.
-            Note: No auxiliary loss is computed or returned.
         """
         scores = linear(x, self.weight)
+        
+        if self.dynamic_gate:
+            # Add dynamic load balancing bias
+            scores = scores + torch.log(self.expert_counts + 1e-9)
+
         if self.score_func == "softmax":
             scores = scores.softmax(dim=-1, dtype=torch.float32)
         else:
             scores = scores.sigmoid()
+        
         original_scores = scores
-        if self.bias is not None:
+
+        if not self.dynamic_gate and self.bias is not None:
             scores = scores + self.bias
+
         if self.n_groups > 1:
             scores = scores.view(x.size(0), self.n_groups, -1)
-            if self.bias is None:
-                group_scores = scores.amax(dim=-1)
-            else:
-                group_scores = scores.topk(2, dim=-1)[0].sum(dim=-1)
+            group_scores = scores.amax(dim=-1) if (self.dynamic_gate or self.bias is None) else scores.topk(2, dim=-1)[0].sum(dim=-1)
+            
             indices = group_scores.topk(self.topk_groups, dim=-1)[1]
-            mask = scores.new_ones(x.size(0), self.n_groups, dtype=bool).scatter_(1, indices, False)
+            mask = scores.new_ones(x.size(0), self.n_groups, dtype=torch.bool).scatter_(1, indices, False)
             scores = scores.masked_fill_(mask.unsqueeze(-1), float("-inf")).flatten(1)
+
         indices = torch.topk(scores, self.topk, dim=-1)[1]
         weights = original_scores.gather(1, indices)
+
+        if self.training and self.dynamic_gate:
+            # Update expert counts
+            one_hot_indices = F.one_hot(indices, num_classes=self.n_routed_experts)
+            self.expert_counts += one_hot_indices.sum(dim=[0, 1])
+
         if self.score_func == "sigmoid":
             weights /= weights.sum(dim=-1, keepdim=True)
+            
         weights *= self.route_scale
         return weights.type_as(x), indices
 
