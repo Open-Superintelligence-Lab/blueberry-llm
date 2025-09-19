@@ -57,6 +57,7 @@ def run_experiment(dynamic_gate: bool, num_epochs=10):
     Returns:
         A dictionary containing results: accuracy, final_loss, expert_utilization.
     """
+    torch.set_default_dtype(torch.bfloat16)
     print(f"--- Running Experiment with dynamic_gate = {dynamic_gate} ---")
 
     # Model Configuration
