@@ -285,8 +285,9 @@ class MLA(nn.Module):
         kv = kv.view(bsz, seqlen, self.n_local_heads, self.qk_nope_head_dim + self.v_head_dim)
         k_nope, v = torch.split(kv, [self.qk_nope_head_dim, self.v_head_dim], dim=-1)
         k = torch.cat([k_nope, k_pe.expand(-1, -1, self.n_local_heads, -1)], dim=-1)
-        self.k_cache[:bsz, start_pos:end_pos] = k
-        self.v_cache[:bsz, start_pos:end_pos] = v
+        with torch.no_grad():
+            self.k_cache[:bsz, start_pos:end_pos] = k.detach()
+            self.v_cache[:bsz, start_pos:end_pos] = v.detach()
         scores = torch.einsum("bshd,bthd->bsht", q, self.k_cache[:bsz, :end_pos]) * self.softmax_scale
         
         if mask is not None:
