@@ -222,6 +222,7 @@ class MultiHeadAttention(nn.Module):
 
         self.qkv = nn.Linear(d_model, total_qkv_dim, bias=False)
         self.w_o = nn.Linear(d_model, d_model, bias=False)
+        self.w_o.ZERO_INIT = 1
         
         self.q_norm = nn.RMSNorm(self.d_k, eps=1e-6)
         self.k_norm = nn.RMSNorm(self.d_k, eps=1e-6)
@@ -482,7 +483,11 @@ class MoEMinimalLLM(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
+        
+        if hasattr(module, 'ZERO_INIT'):
+            if isinstance(module, nn.Linear):
+                torch.nn.init.zeros_(module.weight)  
+        elif isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
