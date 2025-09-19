@@ -69,6 +69,7 @@ def run_experiment(dynamic_gate: bool, num_epochs=10):
         n_activated_experts=2,
         vocab_size=20,
         max_seq_len=15,
+        max_batch_size=32, # Match DataLoader batch_size
         dynamic_gate=dynamic_gate
     )
     
