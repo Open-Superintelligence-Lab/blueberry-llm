@@ -29,7 +29,7 @@ class MultiHeadAttention(nn.Module):
         n_kv_heads: int,
         norm_type: str,
         max_seq_len: int, 
-        dropout: float = 0.1, 
+        dropout: float = 0.0, 
         use_fp8: bool = False,
         attention_scale: Optional[float] = None
     ):
@@ -139,7 +139,7 @@ class Expert(nn.Module):
         self, 
         d_model: int, 
         d_ff: int, 
-        dropout: float = 0.1, 
+        dropout: float = 0.0, 
         use_fp8: bool = False,
         activation: str = "silu"
     ):
@@ -274,7 +274,7 @@ class MixtureOfExperts(nn.Module):
         d_ff: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1,
+        dropout: float = 0.0,
         load_balancing_weight: float = 0.01,
         use_fp8: bool = False,
         activation: str = "silu"
@@ -402,7 +402,7 @@ class MoETransformerBlock(nn.Module):
         max_seq_len: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1,
+        dropout: float = 0.0,
         use_fp8: bool = False,
         norm_type: str = "rms"
     ):
@@ -477,7 +477,7 @@ class StandardTransformerBlock(nn.Module):
         n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
-        dropout: float = 0.1,
+        dropout: float = 0.0,
         use_fp8: bool = False,
         norm_type: str = "rms",
         activation: str = "silu"

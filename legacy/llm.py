@@ -58,7 +58,7 @@ class MoEModelConfig:
 
     # Regularization
     weight_decay: float = 0.1
-    dropout: float = 0.1
+    dropout: float = 0.0
     grad_clip: float = 1.0
 
     # Technical
@@ -209,7 +209,7 @@ class Rotary(nn.Module):
         return self.rope(x_BTHD)
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int, max_seq_len: int, dropout: float = 0.0):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
@@ -266,7 +266,7 @@ class MultiHeadAttention(nn.Module):
 
 class Expert(nn.Module):
     """Single expert network (essentially a FeedForward layer)"""
-    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.0):
         super().__init__()
         self.linear1 = nn.Linear(d_model, d_ff, bias=False)
         self.linear2 = nn.Linear(d_ff, d_model, bias=False)
@@ -321,7 +321,7 @@ class MixtureOfExperts(nn.Module):
         d_ff: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1,
+        dropout: float = 0.0,
         load_balancing_weight: float = 0.01
     ):
         super().__init__()
@@ -418,7 +418,7 @@ class MoETransformerBlock(nn.Module):
         max_seq_len: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.0
     ):
         super().__init__()
 

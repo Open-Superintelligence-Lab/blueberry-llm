@@ -44,7 +44,7 @@ class AdaptiveMoEModelConfig:
 
     # Regularization
     weight_decay: float = 0.1
-    dropout: float = 0.1
+    dropout: float = 0.0
     grad_clip: float = 1.0
 
     # Technical
