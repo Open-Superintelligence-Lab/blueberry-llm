@@ -38,7 +38,8 @@ class MoEModelConfig:
     n_heads: int = 8
     n_kv_heads: int = field(init=False)
     n_layers: int = 6
-    d_ff: int = 1536
+    d_ff: int = field(init=False)
+    multiple_of: int = 128
     batch_size: int = 24
     max_steps: int = 1000
 
@@ -71,10 +72,14 @@ class MoEModelConfig:
     load_balancing_weight: float = 0.01
 
     def __post_init__(self):
-        self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
-
+        self.d_k = self.d_model // self.n_heads
+        
+        assert self.n_heads % 4 == 0, "n_heads must be divisible by 4"
         self.n_kv_heads = self.n_heads // 4
+        
+        self.d_ff = int(self.multiple_of * int((((self.d_model * 4 * 2 / 3) * 1.3) + self.multiple_of + 1) // self.multiple_of))
+        
 
 @torch.compile
 def zeropower_via_newtonschulz5(G: torch.Tensor, steps: int = 5) -> torch.Tensor:

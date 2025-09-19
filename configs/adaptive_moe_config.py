@@ -24,7 +24,8 @@ class AdaptiveMoEModelConfig:
     n_heads: int = 8
     n_kv_heads: int = field(init=False)
     n_layers: int = 6
-    d_ff: int = 1536
+    d_ff: int = field(init=False)
+    multiple_of: int = 128
     batch_size: int = 24
     max_steps: int = 1000
 
@@ -72,6 +73,8 @@ class AdaptiveMoEModelConfig:
         
         assert self.n_heads % 4 == 0, "n_heads must be divisible by 4"
         self.n_kv_heads = self.n_heads // 4
+        
+        self.d_ff = int(self.multiple_of * int((((self.d_model * 4 * 2 / 3) * 1.3) + self.multiple_of + 1) // self.multiple_of))
         
         # Auto-detect optimal settings based on GPU
         if SYSTEM_CONFIG.has_fp8_support and self.use_fp8:
