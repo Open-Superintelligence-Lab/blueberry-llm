@@ -13,7 +13,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 import time
 from transformers import AutoTokenizer
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 import warnings
 import os
@@ -36,6 +36,7 @@ class MoEModelConfig:
     # Model architecture
     d_model: int = 384
     n_heads: int = 8
+    n_kv_heads: int = field(init=False)
     n_layers: int = 6
     d_ff: int = 1536
     batch_size: int = 24
@@ -72,6 +73,8 @@ class MoEModelConfig:
     def __post_init__(self):
         self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+
+        self.n_kv_heads = self.n_heads // 4
 
 @torch.compile
 def zeropower_via_newtonschulz5(G: torch.Tensor, steps: int = 5) -> torch.Tensor:
@@ -201,13 +204,18 @@ class Rotary(nn.Module):
         return self.rope(x_BTHD)
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int, max_seq_len: int, dropout: float = 0.1):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
+        self.n_kv_heads = n_kv_heads
         self.d_k = d_model // n_heads
+        self.repeats = self.n_heads // self.n_kv_heads
+        
+        total_qkv_dim = (self.n_heads + (2 * self.n_kv_heads)) * self.d_k
+        
 
-        self.qkv = nn.Linear(d_model, d_model * 3, bias=False)
+        self.qkv = nn.Linear(d_model, total_qkv_dim, bias=False)
         self.w_o = nn.Linear(d_model, d_model, bias=False)
         self.rotary = Rotary(self.d_k, max_seq_len)
         self.dropout = dropout
@@ -218,15 +226,25 @@ class MultiHeadAttention(nn.Module):
         # qkv = self.qkv(x).reshape(B, T, 3, self.n_heads, self.d_k).permute(2, 0, 3, 1, 4)
         # Q, K, V = qkv[0], qkv[1], qkv[2]  # [B, H, T, D]
 
-        qkv = self.qkv(x).reshape(batch_size, seq_len, 3, self.n_heads, self.d_k)
-        qkv = qkv.permute(2, 0, 3, 1, 4)
-        Q, K, V = qkv[0], qkv[1], qkv[2] # [B, H, T, D]
+        qkv = self.qkv(x)
+        q_size = self.n_heads * self.d_k
+        kv_size = self.n_kv_heads * self.d_k
+        
+        Q, K, V = torch.split(qkv, [q_size, kv_size, kv_size], dim=-1)
+    
+        Q = Q.view(batch_size, seq_len, self.n_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_heads, seq_len, d_k]
+        K = K.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+        V = V.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+
 
         # Q = self.rotary(Q)
         # K = self.rotary(K)
         # Apply RoPE on [B, T, H, D]
         Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
         K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
+        
+        K = K.repeat_interleave(self.repeats, dim=1)
+        V = V.repeat_interleave(self.repeats, dim=1)
 
         attn_output = F.scaled_dot_product_attention(
             Q, K, V, is_causal=True, dropout_p=self.dropout if self.training else 0.0
@@ -386,6 +404,7 @@ class MoETransformerBlock(nn.Module):
         self,
         d_model: int,
         n_heads: int,
+        n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
         num_experts: int = 8,
@@ -395,7 +414,7 @@ class MoETransformerBlock(nn.Module):
         super().__init__()
 
         # Attention layer
-        self.attention = MultiHeadAttention(d_model, n_heads, max_seq_len, dropout)
+        self.attention = MultiHeadAttention(d_model, n_heads, n_kv_heads, max_seq_len, dropout)
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(
@@ -433,6 +452,7 @@ class MoEMinimalLLM(nn.Module):
             MoETransformerBlock(
                 config.d_model,
                 config.n_heads,
+                config.n_kv_heads,
                 config.d_ff,
                 config.max_seq_len,
                 config.num_experts,

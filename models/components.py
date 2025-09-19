@@ -90,7 +90,7 @@ class MultiHeadAttention(nn.Module):
         batch_size, seq_len = x.size(0), x.size(1)
 
         # QKV projection
-        qkv = self.qkv(x)  # [batch_size, seq_len, 3 * d_model]
+        qkv = self.qkv(x)
         q_size = self.n_heads * self.d_k
         kv_size = self.n_kv_heads * self.d_k
         
