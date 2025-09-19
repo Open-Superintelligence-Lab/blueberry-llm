@@ -373,9 +373,10 @@ class Gate(nn.Module):
         weights = original_scores.gather(1, indices)
 
         if self.training and self.dynamic_gate:
-            # Update expert counts
+            # Update expert counts (detached to avoid computation graph cycles)
             one_hot_indices = F.one_hot(indices, num_classes=self.n_routed_experts)
-            self.expert_counts += one_hot_indices.sum(dim=[0, 1])
+            with torch.no_grad():
+                self.expert_counts += one_hot_indices.sum(dim=[0, 1]).detach()
 
         if self.score_func == "sigmoid":
             weights /= weights.sum(dim=-1, keepdim=True)
