@@ -27,6 +27,7 @@ class MultiHeadAttention(nn.Module):
         d_model: int, 
         n_heads: int, 
         n_kv_heads: int,
+        norm_type: str,
         max_seq_len: int, 
         dropout: float = 0.1, 
         use_fp8: bool = False,
@@ -61,6 +62,9 @@ class MultiHeadAttention(nn.Module):
         # Output projection with zero initialization (from reference implementation)
         self.w_o = create_adaptive_linear(d_model, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
         
+        self.q_norm = AdaptiveLayerNorm(self.d_k, eps=1e-6, norm_type=norm_type)
+        self.k_norm = AdaptiveLayerNorm(self.d_k, eps=1e-6, norm_type=norm_type)
+
         # Rotary positional embedding
         self.rotary = Rotary(self.d_k, max_seq_len)
         
@@ -102,8 +106,8 @@ class MultiHeadAttention(nn.Module):
 
         # Apply rotary positional embedding
         # Convert to [batch_size, seq_len, n_heads, d_k] for RoPE
-        Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
-        K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
+        Q = self.rotary(self.q_norm(Q).transpose(1, 2)).transpose(1, 2)
+        K = self.rotary(self.k_norm(K).transpose(1, 2)).transpose(1, 2)
         
         K = K.repeat_interleave(self.repeats, dim=1)
         V = V.repeat_interleave(self.repeats, dim=1)
@@ -420,7 +424,7 @@ class MoETransformerBlock(nn.Module):
 
         # Attention layer with adaptive operations
         self.attention = MultiHeadAttention(
-            d_model, n_heads, n_kv_heads, max_seq_len, dropout, use_fp8=use_fp8
+            d_model, n_heads, n_kv_heads, norm_type, max_seq_len, dropout, use_fp8=use_fp8
         )
 
         # MoE layer with adaptive operations

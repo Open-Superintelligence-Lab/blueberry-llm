@@ -222,6 +222,10 @@ class MultiHeadAttention(nn.Module):
 
         self.qkv = nn.Linear(d_model, total_qkv_dim, bias=False)
         self.w_o = nn.Linear(d_model, d_model, bias=False)
+        
+        self.q_norm = nn.RMSNorm(self.d_k, eps=1e-6)
+        self.k_norm = nn.RMSNorm(self.d_k, eps=1e-6)
+        
         self.rotary = Rotary(self.d_k, max_seq_len)
         self.dropout = dropout
 
@@ -245,8 +249,8 @@ class MultiHeadAttention(nn.Module):
         # Q = self.rotary(Q)
         # K = self.rotary(K)
         # Apply RoPE on [B, T, H, D]
-        Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
-        K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
+        Q = self.rotary(self.q_norm(Q).transpose(1, 2)).transpose(1, 2)
+        K = self.rotary(self.k_norm(K).transpose(1, 2)).transpose(1, 2)
         
         K = K.repeat_interleave(self.repeats, dim=1)
         V = V.repeat_interleave(self.repeats, dim=1)
