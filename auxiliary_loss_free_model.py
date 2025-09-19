@@ -348,8 +348,8 @@ class Gate(nn.Module):
         scores = linear(x, self.weight)
         
         if self.dynamic_gate:
-            # Add dynamic load balancing bias
-            scores = scores + torch.log(self.expert_counts + 1e-9)
+            # Add dynamic load balancing bias (detached to avoid computation graph cycles)
+            scores = scores + torch.log(self.expert_counts.detach() + 1e-9)
 
         if self.score_func == "softmax":
             scores = scores.softmax(dim=-1, dtype=torch.float32)
