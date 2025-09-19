@@ -16,7 +16,7 @@ from system import SYSTEM_CONFIG
 
 class MultiHeadAttention(nn.Module):
     """
-    Multi-head attention with GPU-adaptive optimizations.
+    Grouped-Query Attention with GPU-adaptive optimizations.
     
     This implementation uses adaptive linear layers and supports
     architecture-specific optimizations like custom attention scaling.
@@ -26,13 +26,14 @@ class MultiHeadAttention(nn.Module):
         self, 
         d_model: int, 
         n_heads: int, 
+        n_kv_heads: int,
         max_seq_len: int, 
         dropout: float = 0.1, 
         use_fp8: bool = False,
         attention_scale: Optional[float] = None
     ):
         """
-        Initialize multi-head attention.
+        Initialize Grouped-Query Attention.
         
         Args:
             d_model: Model dimension
@@ -45,13 +46,17 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
+        self.n_kv_heads = n_kv_heads
         self.d_k = d_model // n_heads
         self.use_fp8 = use_fp8
+        self.repeats = self.n_heads // self.n_kv_heads
+        
+        total_qkv_dim = (self.n_heads + (self.n_kv_heads * 2)) * self.d_k
         
         assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
 
         # QKV projection using adaptive linear layers
-        self.qkv = AdaptiveLinear(d_model, d_model * 3, bias=False, use_fp8=use_fp8)
+        self.qkv = AdaptiveLinear(d_model, total_qkv_dim, bias=False, use_fp8=use_fp8)
         
         # Output projection with zero initialization (from reference implementation)
         self.w_o = create_adaptive_linear(d_model, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
@@ -74,7 +79,7 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of multi-head attention.
+        Forward pass of Grouped-Query Attention.
         
         Args:
             x: Input tensor [batch_size, seq_len, d_model]
@@ -86,14 +91,22 @@ class MultiHeadAttention(nn.Module):
 
         # QKV projection
         qkv = self.qkv(x)  # [batch_size, seq_len, 3 * d_model]
-        qkv = qkv.reshape(batch_size, seq_len, 3, self.n_heads, self.d_k)
-        qkv = qkv.permute(2, 0, 3, 1, 4)  # [3, batch_size, n_heads, seq_len, d_k]
-        Q, K, V = qkv[0], qkv[1], qkv[2]
+        q_size = self.n_heads * self.d_k
+        kv_size = self.n_kv_heads * self.d_k
+        
+        Q, K, V = torch.split(qkv, [q_size, kv_size, kv_size], dim=-1)
+    
+        Q = Q.view(batch_size, seq_len, self.n_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_heads, seq_len, d_k]
+        K = K.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+        V = V.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
 
         # Apply rotary positional embedding
         # Convert to [batch_size, seq_len, n_heads, d_k] for RoPE
         Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
         K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
+        
+        K = K.repeat_interleave(self.repeats, dim=1)
+        V = V.repeat_interleave(self.repeats, dim=1)
 
         # Scaled dot-product attention with custom scaling
         attn_output = F.scaled_dot_product_attention(
@@ -372,7 +385,7 @@ class MoETransformerBlock(nn.Module):
     """
     Transformer block with mixture of experts.
     
-    This combines multi-head attention with MoE feed-forward layers,
+    This combines Grouped-Query Attention with MoE feed-forward layers,
     including proper normalization and residual connections.
     """
     
@@ -380,6 +393,7 @@ class MoETransformerBlock(nn.Module):
         self,
         d_model: int,
         n_heads: int,
+        n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
         num_experts: int = 8,
@@ -406,7 +420,7 @@ class MoETransformerBlock(nn.Module):
 
         # Attention layer with adaptive operations
         self.attention = MultiHeadAttention(
-            d_model, n_heads, max_seq_len, dropout, use_fp8=use_fp8
+            d_model, n_heads, n_kv_heads, max_seq_len, dropout, use_fp8=use_fp8
         )
 
         # MoE layer with adaptive operations
@@ -456,6 +470,7 @@ class StandardTransformerBlock(nn.Module):
         self,
         d_model: int,
         n_heads: int,
+        n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
         dropout: float = 0.1,
@@ -480,7 +495,7 @@ class StandardTransformerBlock(nn.Module):
 
         # Attention layer
         self.attention = MultiHeadAttention(
-            d_model, n_heads, max_seq_len, dropout, use_fp8=use_fp8
+            d_model, n_heads, n_kv_heads, max_seq_len, dropout, use_fp8=use_fp8
         )
 
         # Standard feed-forward layer
