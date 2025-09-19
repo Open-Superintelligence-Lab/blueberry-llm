@@ -201,7 +201,7 @@ class Rotary(nn.Module):
         return self.rope(x_BTHD)
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int, max_seq_len: int, dropout: float = 0.1):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
@@ -386,6 +386,7 @@ class MoETransformerBlock(nn.Module):
         self,
         d_model: int,
         n_heads: int,
+        n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
         num_experts: int = 8,
@@ -395,7 +396,7 @@ class MoETransformerBlock(nn.Module):
         super().__init__()
 
         # Attention layer
-        self.attention = MultiHeadAttention(d_model, n_heads, max_seq_len, dropout)
+        self.attention = MultiHeadAttention(d_model, n_heads, n_kv_heads, max_seq_len, dropout)
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(
@@ -433,6 +434,7 @@ class MoEMinimalLLM(nn.Module):
             MoETransformerBlock(
                 config.d_model,
                 config.n_heads,
+                config.n_kv_heads,
                 config.d_ff,
                 config.max_seq_len,
                 config.num_experts,
