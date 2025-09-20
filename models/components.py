@@ -155,9 +155,13 @@ class Expert(nn.Module):
         """
         super().__init__()
         
-        self.w1 = AdaptiveLinear(d_model, d_ff, bias=False, use_fp8=use_fp8)
-        self.w2 = AdaptiveLinear(d_ff, d_model, bias=False, use_fp8=use_fp8)
-        self.w3 = create_adaptive_linear(d_model, d_ff, bias=False, zero_init=True, use_fp8=use_fp8)
+        # self.w1 = AdaptiveLinear(d_model, d_ff, bias=False, use_fp8=use_fp8)
+        # self.w2 = AdaptiveLinear(d_ff, d_model, bias=False, use_fp8=use_fp8)
+        # self.w3 = create_adaptive_linear(d_model, d_ff, bias=False, zero_init=True, use_fp8=use_fp8)
+        
+        # Two-layer MLP with adaptive operations
+        self.linear1 = AdaptiveLinear(d_model, d_ff, bias=False, use_fp8=use_fp8)
+        self.linear2 = create_adaptive_linear(d_ff, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
         
         self.dropout = nn.Dropout(dropout)
         
@@ -185,7 +189,8 @@ class Expert(nn.Module):
             Output tensor [batch_size, seq_len, d_model]
         """
         
-        return self.w2(self.dropout(self.act_fn(self.w1(x))) * self.w3(x))
+        # return self.w2(self.dropout(self.act_fn(self.w1(x))) * self.w3(x))
+        return self.linear2(self.dropout(self.act_fn(self.linear1(x))))
 
 
 class TopKRouter(nn.Module):
