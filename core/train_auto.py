@@ -110,24 +110,34 @@ def main():
     # Get model configuration
     model_config = configurator.get_model_config()
     
-    # Auto-size dataset based on hardware (use already-detected config)
-    if configurator.config.num_gpus == 0:
-        model_config.num_documents = 500
-        model_config.max_tokens = 50000
-    elif configurator.config.gpu_memory_gb >= 14:  # T4 and similar high-memory GPUs
-        model_config.num_documents = 2000
-        model_config.max_tokens = 200000
-    elif configurator.config.gpu_memory_gb < 16:
-        model_config.num_documents = 1000
-        model_config.max_tokens = 100000
-    elif configurator.config.num_gpus <= 2:
-        model_config.num_documents = 2000
-        model_config.max_tokens = 250000
-    else:
-        model_config.num_documents = 5000
-        model_config.max_tokens = 500000
     
-    print(f"\n📊 Loading {model_config.num_documents} documents, {model_config.max_tokens:,} tokens...")
+    # Yeah… i killed this auto-scaling thing. On purpose.
+    # Look — it doesn’t matter if you’re running this on a toaster or a datacenter GPU.
+    # We can feed the model whatever size data we want. Seriously.
+    
+    # # Auto-size dataset based on hardware (use already-detected config)
+    # if configurator.config.num_gpus == 0:
+    #     model_config.num_documents = 500
+    #     model_config.max_tokens = 50000
+    # elif configurator.config.gpu_memory_gb >= 14:  # T4 and similar high-memory GPUs
+    #     model_config.num_documents = 2000
+    #     model_config.max_tokens = 200000
+    # elif configurator.config.gpu_memory_gb < 16:
+    #     model_config.num_documents = 1000
+    #     model_config.max_tokens = 100000
+    # elif configurator.config.num_gpus <= 2:
+    #     model_config.num_documents = 2000
+    #     model_config.max_tokens = 250000
+    # else:
+    #     model_config.num_documents = 5000
+    #     model_config.max_tokens = 500000
+    
+    # print(f"\n📊 Loading {model_config.num_documents} documents, {model_config.max_tokens:,} tokens...")
+    
+    
+    model_config.max_tokens = -1
+    print(f"\n📊 Loading documents")
+    
     
     # Load data
     texts, tokenizer, tokens = load_and_cache_data(model_config)

@@ -49,8 +49,7 @@ class MoEModelConfig:
 
     # Data parameters
     max_seq_len: int = 512
-    num_documents: int = 2000
-    max_tokens: int = 500000
+    max_tokens: int = -1 # set to -1 to include all tokens
 
     # Evaluation
     eval_every: int = 500
@@ -131,7 +130,7 @@ class Muon(torch.optim.Optimizer):
 def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
     """Load and cache tokenized data to avoid reprocessing"""
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f"{cache_dir}/tokenized_data_{config.num_documents}_{config.max_tokens}.pkl"
+    cache_file = f"{cache_dir}/tokenized_data_{config.max_tokens}.pkl"
 
     # Check if cached data exists
     if os.path.exists(cache_file):
@@ -155,24 +154,29 @@ def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
         tokenizer.pad_token = tokenizer.eos_token
 
     # Load dataset
-    dataset = load_dataset("HuggingFaceTB/smollm-corpus", "cosmopedia-v2", split="train", streaming=True, token=False)
-
+    dataset = load_dataset("Hosseinlack123/PicoLM-dataset", token=False)['train']
+    
     texts = []
     for i, item in enumerate(dataset):
-        if i >= config.num_documents:
-            break
-        texts.append(item["text"][:3000])
-
-    print(f"Loaded {len(texts)} documents")
+        texts.append(item["text"])
+        
+    print(f"Loaded {len(texts)} Docs")
 
     # Tokenize
     print("Tokenizing texts...")
+    
+    max_tokens = config.max_tokens
+    
     all_tokens = []
     for text in tqdm(texts, desc="Tokenizing"):
-        tokens = tokenizer.encode(text, add_special_tokens=False)
+        tokens = tokenizer.encode(text + tokenizer.eos_token, add_special_tokens=False)
         all_tokens.extend(tokens)
+        
+        # Stop if we have enough tokens
+        if max_tokens != -1 and len(all_tokens) >= max_tokens:
+            break
 
-    tokens = all_tokens[:config.max_tokens]
+    tokens = all_tokens[:max_tokens]
     print(f"Using {len(tokens):,} tokens")
     config.vocab_size = tokenizer.vocab_size
 

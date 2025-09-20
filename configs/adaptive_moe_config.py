@@ -35,7 +35,6 @@ class AdaptiveMoEModelConfig:
 
     # Data parameters
     max_seq_len: int = 512
-    num_documents: int = 2000
     max_tokens: int = 500000
 
     # Evaluation
@@ -154,7 +153,7 @@ def get_rtx4090_config() -> AdaptiveMoEModelConfig:
         d_ff=3072,    # Increased from 1536
         batch_size=24,  # Increased from 16
         max_steps=2000,  # Increased from 1000
-        max_seq_len=2048,  # Increased from 1024
+        max_seq_len=1024,
         num_experts=16,  # Increased from 8
         expert_top_k=2,
         gradient_accumulation_steps=2,  # Reduced for larger batch
@@ -192,7 +191,7 @@ def get_development_config() -> AdaptiveMoEModelConfig:
         d_ff=1024,   # 1024 is divisible by 16
         batch_size=16,
         max_steps=500,
-        max_seq_len=256,
+        max_seq_len=512,
         num_experts=8,  # Changed from 4 to 8 (8 is divisible by 16)
         expert_top_k=2,
         eval_every=100,

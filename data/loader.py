@@ -45,7 +45,7 @@ def load_and_cache_data(
         Tuple of (texts, tokenizer, tokens)
     """
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f"{cache_dir}/tokenized_data_{config.num_documents}_{config.max_tokens}.pkl"
+    cache_file = f"{cache_dir}/tokenized_data_{config.max_tokens}.pkl"
 
     # Check if cached data exists
     if os.path.exists(cache_file):
@@ -67,7 +67,7 @@ def load_and_cache_data(
     tokenizer = _load_tokenizer()
     
     # Load and process documents
-    texts = _load_documents(config.num_documents)
+    texts = _load_documents()
     
     # Tokenize texts
     tokens = _tokenize_texts(texts, tokenizer, config.max_tokens)
@@ -95,40 +95,30 @@ def _load_tokenizer():
     return tokenizer
 
 
-def _load_documents(num_documents: int, max_chars_per_doc: int = 3000) -> List[str]:
+def _load_documents() -> List[str]:
     """
     Load documents from the dataset.
-    
-    Args:
-        num_documents: Number of documents to load
-        max_chars_per_doc: Maximum characters per document
-        
+            
     Returns:
         List of text documents
     """
     if not DATASETS_AVAILABLE:
         raise ImportError("datasets package is required for data loading. Install with: pip install datasets")
     
-    print(f"📚 Loading {num_documents} documents...")
     
     # Load dataset
     dataset = load_dataset(
-        "HuggingFaceTB/smollm-corpus", 
-        "cosmopedia-v2", 
-        split="train", 
-        streaming=True, 
+        "Hosseinlack123/PicoLM-dataset", 
         token=False
-    )
-
+    )['train']
+    
+    
     texts = []
     for i, item in enumerate(dataset):
-        if i >= num_documents:
-            break
-        # Truncate documents to reasonable length
-        text = item["text"][:max_chars_per_doc]
+        text = item["text"]
         texts.append(text)
 
-    print(f"✅ Loaded {len(texts)} documents")
+    print(f"✅ Loaded {len(texts)} Docs")
     return texts
 
 
@@ -146,13 +136,14 @@ def _tokenize_texts(texts: List[str], tokenizer: AutoTokenizer, max_tokens: int)
     """
     print("🔤 Tokenizing texts...")
     
+
     all_tokens = []
     for text in tqdm(texts, desc="Tokenizing"):
-        tokens = tokenizer.encode(text, add_special_tokens=False)
+        tokens = tokenizer.encode(text + tokenizer.eos_token, add_special_tokens=False)
         all_tokens.extend(tokens)
         
         # Stop if we have enough tokens
-        if len(all_tokens) >= max_tokens:
+        if max_tokens != -1 and len(all_tokens) >= max_tokens:
             break
 
     tokens = all_tokens[:max_tokens]
@@ -163,8 +154,7 @@ def _tokenize_texts(texts: List[str], tokenizer: AutoTokenizer, max_tokens: int)
 def load_custom_dataset(
     dataset_name: str,
     subset: str = None,
-    num_documents: int = 1000,
-    max_tokens: int = 500000,
+    max_tokens: int = -1,
     cache_dir: str = "data_cache"
 ) -> Tuple[List[str], AutoTokenizer, List[int]]:
     """
@@ -173,14 +163,13 @@ def load_custom_dataset(
     Args:
         dataset_name: Name of the dataset on HuggingFace Hub
         subset: Subset/configuration of the dataset
-        num_documents: Number of documents to load
         max_tokens: Maximum number of tokens
         cache_dir: Directory to store cached data
         
     Returns:
         Tuple of (texts, tokenizer, tokens)
     """
-    cache_file = f"{cache_dir}/custom_{dataset_name}_{subset}_{num_documents}_{max_tokens}.pkl"
+    cache_file = f"{cache_dir}/custom_{dataset_name}_{subset}_{max_tokens}.pkl"
     
     # Check cache first
     if os.path.exists(cache_file):
@@ -203,12 +192,9 @@ def load_custom_dataset(
     # Extract texts (assuming 'text' field exists)
     texts = []
     for i, item in enumerate(dataset):
-        if i >= num_documents:
-            break
-        
         # Try different common field names
         text = item.get('text') or item.get('content') or item.get('article') or str(item)
-        texts.append(text[:3000])  # Truncate
+        texts.append(text)
     
     # Tokenize
     tokens = _tokenize_texts(texts, tokenizer, max_tokens)

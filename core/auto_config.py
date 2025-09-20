@@ -112,7 +112,7 @@ class BlueberryAutoConfigurator:
             gradient_accumulation_steps=4,  # 16 * 4 = 64
             max_steps=1500, 
             learning_rate=0.01,
-            max_seq_len=1024,  # Moderate increase from 512 (was 1024)
+            max_seq_len=512,
             use_distributed=(num_gpus > 1),
             use_amp=True,
             use_megatron=False

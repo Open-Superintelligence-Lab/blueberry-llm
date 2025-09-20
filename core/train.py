@@ -105,8 +105,6 @@ def get_config(args):
         config.batch_size = args.batch_size
     if args.lr is not None:
         config.muon_lr = args.lr
-    if args.num_documents is not None:
-        config.num_documents = args.num_documents
     if args.max_tokens is not None:
         config.max_tokens = args.max_tokens
     if args.max_seq_len is not None:
