@@ -269,12 +269,16 @@ class Expert(nn.Module):
     """Single expert network (essentially a FeedForward layer)"""
     def __init__(self, d_model: int, d_ff: int, dropout: float = 0.0):
         super().__init__()
-        self.linear1 = nn.Linear(d_model, d_ff, bias=False)
-        self.linear2 = nn.Linear(d_ff, d_model, bias=False)
+        
+        self.w1 = nn.Linear(d_model, d_ff, bias=False) # up_proj
+        self.w2 = nn.Linear(d_ff, d_model, bias=False) # down_proj
+        self.w3 = nn.Linear(d_model, d_ff, bias=False) # gate_proj
+        self.linear3.ZERO_INIT = 1
+        
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        return self.linear2(self.dropout(F.silu(self.linear1(x))))
+        return self.w2(self.dropout(F.silu(self.w1(x))) * self.w3(x))
 
 class TopKRouter(nn.Module):
     """Router that selects top-k experts for each token"""

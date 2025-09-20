@@ -154,13 +154,11 @@ class Expert(nn.Module):
             activation: Activation function ("silu", "gelu", "relu")
         """
         super().__init__()
-        self.d_model = d_model
-        self.d_ff = d_ff
-        self.activation = activation
         
-        # Two-layer MLP with adaptive operations
-        self.linear1 = AdaptiveLinear(d_model, d_ff, bias=False, use_fp8=use_fp8)
-        self.linear2 = create_adaptive_linear(d_ff, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
+        self.w1 = AdaptiveLinear(d_model, d_ff, bias=False, use_fp8=use_fp8)
+        self.w2 = AdaptiveLinear(d_ff, d_model, bias=False, use_fp8=use_fp8)
+        self.w3 = create_adaptive_linear(d_model, d_ff, bias=False, zero_init=True, use_fp8=use_fp8)
+        
         self.dropout = nn.Dropout(dropout)
         
         # Choose activation function
@@ -186,11 +184,8 @@ class Expert(nn.Module):
         Returns:
             Output tensor [batch_size, seq_len, d_model]
         """
-        x = self.linear1(x)
-        x = self.act_fn(x)
-        x = self.dropout(x)
-        x = self.linear2(x)
-        return x
+        
+        return self.w2(self.dropout(self.act_fn(self.w1(x))) * self.w3(x))
 
 
 class TopKRouter(nn.Module):
