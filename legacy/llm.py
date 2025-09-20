@@ -273,7 +273,7 @@ class Expert(nn.Module):
         self.w1 = nn.Linear(d_model, d_ff, bias=False) # up_proj
         self.w2 = nn.Linear(d_ff, d_model, bias=False) # down_proj
         self.w3 = nn.Linear(d_model, d_ff, bias=False) # gate_proj
-        self.linear3.ZERO_INIT = 1
+        self.w3.ZERO_INIT = 1
         
         self.dropout = nn.Dropout(dropout)
 

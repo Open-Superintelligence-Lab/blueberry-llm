@@ -27,7 +27,8 @@ class AutoConfig:
     d_model: int
     n_layers: int
     n_heads: int
-    d_ff: int
+    # n_kv_heads: int
+    # d_ff: int
     num_experts: int
     
     # Training (auto-optimized)
@@ -47,6 +48,9 @@ class BlueberryAutoConfigurator:
     
     def __init__(self):
         self.config = self._detect_and_configure()
+        
+    # def dff_init(self, d_model: int, multiple_of: int):
+        # return int(multiple_of * int((((d_model * 4 * 2 / 3) * 1.3) + multiple_of + 1) // multiple_of))
     
     def _detect_and_configure(self) -> AutoConfig:
         """Main auto-configuration logic"""
@@ -69,7 +73,7 @@ class BlueberryAutoConfigurator:
         # RTX 4090 optimized configuration (increased for better utilization)
         if 'rtx 4090' in device_name or 'geforce rtx 4090' in device_name:
             config = {
-                'd_model': 512, 'n_layers': 12, 'n_heads': 8, 'd_ff': 2048,
+                'd_model': 512, 'n_layers': 12, 'n_heads': 8,
                 'num_experts': 8, 'batch_size': 16, 'max_seq_len': 1024
             }
             gradient_accumulation_steps = 3  # Balanced for larger batch size
@@ -77,7 +81,7 @@ class BlueberryAutoConfigurator:
         else:
             # Default configuration for other GPUs
             config = {
-                'd_model': 384, 'n_layers': 6, 'n_heads': 8, 'd_ff': 1536,
+                'd_model': 384, 'n_layers': 6, 'n_heads': 8,
                 'num_experts': 8, 'batch_size': 16, 'max_seq_len': 1024
             }
             gradient_accumulation_steps = max(1, 32 // config['batch_size'])
@@ -103,7 +107,6 @@ class BlueberryAutoConfigurator:
             d_model=384,  # Moderate increase from 256 (was 512)
             n_layers=6,   # Moderate increase from 4 (was 8)
             n_heads=8,    # Increased from 4
-            d_ff=1536,    # Moderate increase from 1024 (was 2048)
             num_experts=8,  # Increased from 4
             batch_size=12,  # Moderate increase from 8 (was 16)
             gradient_accumulation_steps=3,  # Balanced
@@ -119,7 +122,7 @@ class BlueberryAutoConfigurator:
         """Minimal config for CPU-only systems"""
         return AutoConfig(
             num_gpus=0, gpu_memory_gb=0,
-            d_model=128, n_layers=2, n_heads=4, d_ff=512, num_experts=2,
+            d_model=128, n_layers=2, n_heads=4, num_experts=2,
             batch_size=4, gradient_accumulation_steps=8, max_steps=1000,
             learning_rate=0.001, max_seq_len=256,
             use_distributed=False, use_amp=False, use_megatron=False
@@ -156,7 +159,6 @@ class BlueberryAutoConfigurator:
             d_model=self.config.d_model,
             n_heads=self.config.n_heads,
             n_layers=self.config.n_layers,
-            d_ff=self.config.d_ff,
             batch_size=self.config.batch_size,
             max_steps=self.config.max_steps,
             gradient_accumulation_steps=self.config.gradient_accumulation_steps,
