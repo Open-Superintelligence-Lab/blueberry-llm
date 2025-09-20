@@ -141,7 +141,7 @@ def train_model_native(
     
     # Setup optimizers and schedulers
     optimizers = setup_optimizers(model, config, use_warmup=True)
-    schedulers = [get_lr_scheduler(opt, config, "cosine_warmup") for opt in optimizers]
+    schedulers = [get_lr_scheduler(opt, config, "deepseek_warmup") for opt in optimizers]
     
     # Setup gradient scaler for mixed precision
     scaler = GradScaler('cuda') if config.use_amp else None

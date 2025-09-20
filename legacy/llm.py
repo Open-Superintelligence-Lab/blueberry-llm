@@ -13,7 +13,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 import time
 from transformers import AutoTokenizer
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 import warnings
 import os
@@ -36,10 +36,12 @@ class MoEModelConfig:
     # Model architecture
     d_model: int = 384
     n_heads: int = 8
-    n_layers: int = 6
-    d_ff: int = 1536
-    batch_size: int = 24
-    max_steps: int = 1000
+    n_kv_heads: int = field(init=False)
+    n_layers: int = 8
+    d_ff: int = field(init=False)
+    multiple_of: int = 128
+    batch_size: int = 16
+    max_steps: int = 1500
 
     # Training parameters
     gradient_accumulation_steps: int = 4
@@ -56,7 +58,7 @@ class MoEModelConfig:
 
     # Regularization
     weight_decay: float = 0.1
-    dropout: float = 0.1
+    dropout: float = 0.0
     grad_clip: float = 1.0
 
     # Technical
@@ -65,13 +67,19 @@ class MoEModelConfig:
     log_milestones: Tuple[int, ...] = (250, 500, 1000)
 
     # MoE specific parameters
-    num_experts: int = 8
+    num_experts: int = 6
     expert_top_k: int = 2
     load_balancing_weight: float = 0.01
 
     def __post_init__(self):
-        self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+        self.d_k = self.d_model // self.n_heads
+        
+        assert self.n_heads % 4 == 0, "n_heads must be divisible by 4"
+        self.n_kv_heads = self.n_heads // 4
+        
+        self.d_ff = int(self.multiple_of * int((((self.d_model * 4 * 2 / 3) * 1.3) + self.multiple_of + 1) // self.multiple_of))
+        
 
 @torch.compile
 def zeropower_via_newtonschulz5(G: torch.Tensor, steps: int = 5) -> torch.Tensor:
@@ -201,14 +209,24 @@ class Rotary(nn.Module):
         return self.rope(x_BTHD)
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int, max_seq_len: int, dropout: float = 0.0):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
+        self.n_kv_heads = n_kv_heads
         self.d_k = d_model // n_heads
+        self.repeats = self.n_heads // self.n_kv_heads
+        
+        total_qkv_dim = (self.n_heads + (2 * self.n_kv_heads)) * self.d_k
+        
 
-        self.qkv = nn.Linear(d_model, d_model * 3, bias=False)
+        self.qkv = nn.Linear(d_model, total_qkv_dim, bias=False)
         self.w_o = nn.Linear(d_model, d_model, bias=False)
+        self.w_o.ZERO_INIT = 1
+        
+        self.q_norm = nn.RMSNorm(self.d_k, eps=1e-6)
+        self.k_norm = nn.RMSNorm(self.d_k, eps=1e-6)
+        
         self.rotary = Rotary(self.d_k, max_seq_len)
         self.dropout = dropout
 
@@ -218,15 +236,25 @@ class MultiHeadAttention(nn.Module):
         # qkv = self.qkv(x).reshape(B, T, 3, self.n_heads, self.d_k).permute(2, 0, 3, 1, 4)
         # Q, K, V = qkv[0], qkv[1], qkv[2]  # [B, H, T, D]
 
-        qkv = self.qkv(x).reshape(batch_size, seq_len, 3, self.n_heads, self.d_k)
-        qkv = qkv.permute(2, 0, 3, 1, 4)
-        Q, K, V = qkv[0], qkv[1], qkv[2] # [B, H, T, D]
+        qkv = self.qkv(x)
+        q_size = self.n_heads * self.d_k
+        kv_size = self.n_kv_heads * self.d_k
+        
+        Q, K, V = torch.split(qkv, [q_size, kv_size, kv_size], dim=-1)
+    
+        Q = Q.view(batch_size, seq_len, self.n_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_heads, seq_len, d_k]
+        K = K.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+        V = V.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+
 
         # Q = self.rotary(Q)
         # K = self.rotary(K)
         # Apply RoPE on [B, T, H, D]
-        Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
-        K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
+        Q = self.rotary(self.q_norm(Q).transpose(1, 2)).transpose(1, 2)
+        K = self.rotary(self.k_norm(K).transpose(1, 2)).transpose(1, 2)
+        
+        K = K.repeat_interleave(self.repeats, dim=1)
+        V = V.repeat_interleave(self.repeats, dim=1)
 
         attn_output = F.scaled_dot_product_attention(
             Q, K, V, is_causal=True, dropout_p=self.dropout if self.training else 0.0
@@ -239,13 +267,22 @@ class MultiHeadAttention(nn.Module):
 
 class Expert(nn.Module):
     """Single expert network (essentially a FeedForward layer)"""
-    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.0):
         super().__init__()
+        
+        # self.w1 = nn.Linear(d_model, d_ff, bias=False) # up_proj
+        # self.w2 = nn.Linear(d_ff, d_model, bias=False) # down_proj
+        # self.w3 = nn.Linear(d_model, d_ff, bias=False) # gate_proj
+        # self.w3.ZERO_INIT = 1
+        
         self.linear1 = nn.Linear(d_model, d_ff, bias=False)
         self.linear2 = nn.Linear(d_ff, d_model, bias=False)
+        # self.linear2.ZERO_INIT = 1
+                
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        # return self.w2(self.dropout(F.silu(self.w1(x))) * self.w3(x))
         return self.linear2(self.dropout(F.silu(self.linear1(x))))
 
 class TopKRouter(nn.Module):
@@ -294,7 +331,7 @@ class MixtureOfExperts(nn.Module):
         d_ff: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1,
+        dropout: float = 0.0,
         load_balancing_weight: float = 0.01
     ):
         super().__init__()
@@ -386,16 +423,17 @@ class MoETransformerBlock(nn.Module):
         self,
         d_model: int,
         n_heads: int,
+        n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.0
     ):
         super().__init__()
 
         # Attention layer
-        self.attention = MultiHeadAttention(d_model, n_heads, max_seq_len, dropout)
+        self.attention = MultiHeadAttention(d_model, n_heads, n_kv_heads, max_seq_len, dropout)
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(
@@ -433,6 +471,7 @@ class MoEMinimalLLM(nn.Module):
             MoETransformerBlock(
                 config.d_model,
                 config.n_heads,
+                config.n_kv_heads,
                 config.d_ff,
                 config.max_seq_len,
                 config.num_experts,
@@ -453,7 +492,11 @@ class MoEMinimalLLM(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
+        
+        if hasattr(module, 'ZERO_INIT'):
+            if isinstance(module, nn.Linear):
+                torch.nn.init.zeros_(module.weight)  
+        elif isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
@@ -569,13 +612,19 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     # Learning rate schedule
     schedulers = []
     for optimizer in optimizers:
-        warmup_steps = config.max_steps // 20
+        warmup_steps = int(config.max_steps * 0.06) # ~6.0%
+        milestone_1 = int(config.max_steps * 0.8)
+        milestone_2 = int(config.max_steps * 0.9)
+        
         def lr_lambda(step):
             if step < warmup_steps:
-                return step / warmup_steps
+                return float(step) / float(max(1, warmup_steps))
+            elif step < milestone_1:
+                return 1
+            elif step < milestone_2:
+                return 0.316
             else:
-                progress = (step - warmup_steps) / (config.max_steps - warmup_steps)
-                return 0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * progress))
+                return 0.1
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
         schedulers.append(scheduler)
@@ -651,7 +700,8 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                     'loss': f'{current_loss:.4f}',
                     'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
-                    'ppl': f'{perplexity:.1f}'
+                    'ppl': f'{perplexity:.1f}',
+                    'lr': f'{optimizers[0].param_groups[0]["lr"]:.2e}'
                 })
 
             # Evaluation

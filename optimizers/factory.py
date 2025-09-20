@@ -161,7 +161,7 @@ def setup_parameter_groups(
 def get_lr_scheduler(
     optimizer: torch.optim.Optimizer,
     config: AdaptiveMoEModelConfig,
-    scheduler_type: str = "cosine_warmup"
+    scheduler_type: str = "deepseek_warmup"
 ) -> torch.optim.lr_scheduler.LRScheduler:
     """
     Create learning rate scheduler.
@@ -169,7 +169,7 @@ def get_lr_scheduler(
     Args:
         optimizer: Optimizer to schedule
         config: Model configuration
-        scheduler_type: Type of scheduler ("cosine_warmup", "linear_warmup", "constant")
+        scheduler_type: Type of scheduler ("cosine_warmup", "linear_warmup", "deepseek_warmup", "constant")
         
     Returns:
         Learning rate scheduler
@@ -178,6 +178,8 @@ def get_lr_scheduler(
         return get_cosine_warmup_scheduler(optimizer, config)
     elif scheduler_type == "linear_warmup":
         return get_linear_warmup_scheduler(optimizer, config)
+    elif scheduler_type == "deepseek_warmup":
+        return get_deepseek_warmup_scheduler(optimizer, config)
     elif scheduler_type == "constant":
         return torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0, total_iters=config.max_steps)
     else:
@@ -242,6 +244,44 @@ def get_linear_warmup_scheduler(
             # Linear decay
             progress = (step - warmup_steps) / (config.max_steps - warmup_steps)
             return 1.0 - 0.9 * progress  # Decay to 10% of original LR
+    
+    # Use LambdaLR but ensure it doesn't step until optimizer has stepped
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    
+    # Reset the scheduler's internal step counter to prevent premature stepping
+    scheduler._step_count = 0
+    
+    return scheduler
+
+def get_deepseek_warmup_scheduler(
+    optimizer: torch.optim.Optimizer,
+    config: AdaptiveMoEModelConfig
+) -> torch.optim.lr_scheduler.LRScheduler:
+    """
+    Create deepseek-style warmup followed by "DeepSeek LLM: Scaling Open-Source Language Models with Longtermism" Paper.
+    
+    Args:
+        optimizer: Optimizer to schedule
+        config: Model configuration
+        
+    Returns:
+        Learning rate scheduler
+    """
+    warmup_steps = int(config.max_steps * 0.06)  # ~6% warmup
+    milestone_1 = int(config.max_steps * 0.8)
+    milestone_2 = int(config.max_steps * 0.9)
+    
+    def lr_lambda(step: int) -> float:
+        if step < warmup_steps:
+            # warmup
+            return float(step) / float(max(1, warmup_steps))
+        elif step < milestone_1:
+            return 1.0
+        elif step < milestone_2:
+            return 0.316
+        else:
+            return 0.1
+
     
     # Use LambdaLR but ensure it doesn't step until optimizer has stepped
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
