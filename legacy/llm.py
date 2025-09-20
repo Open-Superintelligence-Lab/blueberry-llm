@@ -40,8 +40,8 @@ class MoEModelConfig:
     n_layers: int = 8
     d_ff: int = field(init=False)
     multiple_of: int = 128
-    batch_size: int = 24
-    max_steps: int = 1000
+    batch_size: int = 16
+    max_steps: int = 1500
 
     # Training parameters
     gradient_accumulation_steps: int = 4

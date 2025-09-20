@@ -76,7 +76,7 @@ class BlueberryAutoConfigurator:
                 'd_model': 512, 'n_layers': 12, 'n_heads': 8,
                 'num_experts': 8, 'batch_size': 16, 'max_seq_len': 1024
             }
-            gradient_accumulation_steps = 3  # Balanced for larger batch size
+            gradient_accumulation_steps = 4  # Balanced for larger batch size
             max_steps = 1500  # More training steps for larger model
         else:
             # Default configuration for other GPUs
@@ -84,8 +84,8 @@ class BlueberryAutoConfigurator:
                 'd_model': 384, 'n_layers': 8, 'n_heads': 8,
                 'num_experts': 6, 'batch_size': 16, 'max_seq_len': 1024
             }
-            gradient_accumulation_steps = max(1, 32 // config['batch_size'])
-            max_steps = 1000
+            gradient_accumulation_steps = max(1, config['batch_size'] // 4)
+            max_steps = 1500
         
         return AutoConfig(
             num_gpus=num_gpus,
@@ -108,9 +108,9 @@ class BlueberryAutoConfigurator:
             n_layers=8,   # Moderate increase from 4 (was 8)
             n_heads=8,    # Increased from 4
             num_experts=6,  # Increased from 4
-            batch_size=12,  # Moderate increase from 8 (was 16)
-            gradient_accumulation_steps=3,  # Balanced
-            max_steps=2000,  # Increased from 1000
+            batch_size=16,  
+            gradient_accumulation_steps=4,  # 16 * 4 = 64
+            max_steps=1500, 
             learning_rate=0.01,
             max_seq_len=1024,  # Moderate increase from 512 (was 1024)
             use_distributed=(num_gpus > 1),
