@@ -277,7 +277,7 @@ class Expert(nn.Module):
         
         self.linear1 = nn.Linear(d_model, d_ff, bias=False)
         self.linear2 = nn.Linear(d_ff, d_model, bias=False)
-        self.linear2.ZERO_INIT = 1
+        # self.linear2.ZERO_INIT = 1
                 
         self.dropout = nn.Dropout(dropout)
 
@@ -700,7 +700,8 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                     'loss': f'{current_loss:.4f}',
                     'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
-                    'ppl': f'{perplexity:.1f}'
+                    'ppl': f'{perplexity:.1f}',
+                    'lr': f'{optimizers[0].param_groups[0]["lr"]:.2e}'
                 })
 
             # Evaluation
