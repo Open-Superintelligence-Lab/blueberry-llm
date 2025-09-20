@@ -81,8 +81,8 @@ class BlueberryAutoConfigurator:
         else:
             # Default configuration for other GPUs
             config = {
-                'd_model': 384, 'n_layers': 6, 'n_heads': 8,
-                'num_experts': 8, 'batch_size': 16, 'max_seq_len': 1024
+                'd_model': 384, 'n_layers': 8, 'n_heads': 8,
+                'num_experts': 6, 'batch_size': 16, 'max_seq_len': 1024
             }
             gradient_accumulation_steps = max(1, 32 // config['batch_size'])
             max_steps = 1000
@@ -105,9 +105,9 @@ class BlueberryAutoConfigurator:
             num_gpus=num_gpus,
             gpu_memory_gb=gpu_memory_gb,
             d_model=384,  # Moderate increase from 256 (was 512)
-            n_layers=6,   # Moderate increase from 4 (was 8)
+            n_layers=8,   # Moderate increase from 4 (was 8)
             n_heads=8,    # Increased from 4
-            num_experts=8,  # Increased from 4
+            num_experts=6,  # Increased from 4
             batch_size=12,  # Moderate increase from 8 (was 16)
             gradient_accumulation_steps=3,  # Balanced
             max_steps=2000,  # Increased from 1000

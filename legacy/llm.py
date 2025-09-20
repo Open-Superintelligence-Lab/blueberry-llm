@@ -37,7 +37,7 @@ class MoEModelConfig:
     d_model: int = 384
     n_heads: int = 8
     n_kv_heads: int = field(init=False)
-    n_layers: int = 6
+    n_layers: int = 8
     d_ff: int = field(init=False)
     multiple_of: int = 128
     batch_size: int = 24
@@ -67,7 +67,7 @@ class MoEModelConfig:
     log_milestones: Tuple[int, ...] = (250, 500, 1000)
 
     # MoE specific parameters
-    num_experts: int = 8
+    num_experts: int = 6
     expert_top_k: int = 2
     load_balancing_weight: float = 0.01
 
