@@ -32,10 +32,10 @@ def load_model(checkpoint_path="blueberry_model.pt"):
         print("✅ Loaded tokenizer from checkpoint")
     else:
         print("⚠️  Tokenizer not found in checkpoint, creating new one...")
-        tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM-135M", token=False)
+        tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2", token=False)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
-        print("✅ Created tokenizer from HuggingFaceTB/SmolLM-135M")
+        print("✅ Created tokenizer from openai-community/gpt2")
     
     # Create model
     model = MoEMinimalLLM(config)
