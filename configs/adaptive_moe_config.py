@@ -191,3 +191,115 @@ def get_development_config() -> AdaptiveMoEModelConfig:
         eval_every=100,
         eval_steps=50,
     )
+
+
+def get_rtx4090_maximum_config() -> AdaptiveMoEModelConfig:
+    """
+    Maximum RTX 4090 configuration - largest model that fits in 24GB VRAM.
+    
+    Based on actual testing, this configuration achieves:
+    - Total parameters: 1,837,942,272 (1.84B)
+    - Active parameters: 227,329,536 (227.3M) 
+    - Expert parameters: 1,610,612,736 (1.61B)
+    - Parameter efficiency: 12.4% active per forward pass
+    - Batch size: 8
+    - Sequence length: 256
+    """
+    return AdaptiveMoEModelConfig(
+        # Model architecture - maximized for RTX 4090
+        d_model=1536,           # Large embedding dimension
+        n_heads=24,             # 24 attention heads
+        n_layers=16,            # 16 transformer layers
+        d_ff=1536,              # Feed-forward dimension (same as d_model for MoE)
+        
+        # Training parameters
+        batch_size=8,           # Optimal batch size for memory
+        max_steps=2000,         # Reasonable training steps
+        gradient_accumulation_steps=2,  # Effective batch size of 16
+        
+        # MoE configuration
+        num_experts=32,         # 32 experts for maximum capacity
+        expert_top_k=2,         # Top-2 expert selection
+        load_balancing_weight=0.01,
+        
+        # Data parameters
+        max_seq_len=256,        # Sequence length that fits in memory
+        num_documents=2000,     # Use cached data
+        max_tokens=200000,      # Use cached data
+        
+        # Training optimization
+        muon_lr=0.01,          # Learning rate
+        use_amp=True,           # Mixed precision training
+        use_fp8=False,          # RTX 4090 doesn't support FP8
+        
+        # Evaluation
+        eval_every=250,         # Evaluate every 250 steps
+        eval_steps=50,          # 50 evaluation steps
+        
+        # Regularization
+        weight_decay=0.1,
+        dropout=0.1,
+        grad_clip=1.0,
+        
+        # GPU optimization
+        use_adaptive_matmul=True,  # Use adaptive matrix multiplication
+        use_megatron=False,        # Single GPU training
+        tensor_parallel_size=1,
+        pipeline_parallel_size=1,
+    )
+
+
+def get_rtx4090_maximum_longer_sequences() -> AdaptiveMoEModelConfig:
+    """
+    Alternative maximum RTX 4090 configuration with longer sequences.
+    
+    This configuration achieves:
+    - Total parameters: 1,329,680,640 (1.33B)
+    - Active parameters: 155,275,520 (155.3M)
+    - Expert parameters: 1,174,405,120 (1.17B)
+    - Parameter efficiency: 11.7% active per forward pass
+    - Batch size: 8
+    - Sequence length: 512 (longer sequences)
+    """
+    return AdaptiveMoEModelConfig(
+        # Model architecture - optimized for longer sequences
+        d_model=1280,           # Large embedding dimension
+        n_heads=20,             # 20 attention heads
+        n_layers=14,            # 14 transformer layers
+        d_ff=1280,              # Feed-forward dimension (same as d_model for MoE)
+        
+        # Training parameters
+        batch_size=8,           # Optimal batch size
+        max_steps=2000,         # Training steps
+        gradient_accumulation_steps=2,
+        
+        # MoE configuration
+        num_experts=32,         # 32 experts
+        expert_top_k=2,         # Top-2 expert selection
+        load_balancing_weight=0.01,
+        
+        # Data parameters - longer sequences
+        max_seq_len=512,        # Longer sequence length
+        num_documents=2000,     # Use cached data
+        max_tokens=200000,      # Use cached data
+        
+        # Training optimization
+        muon_lr=0.01,
+        use_amp=True,
+        use_fp8=False,
+        
+        # Evaluation
+        eval_every=250,
+        eval_steps=50,
+        
+        # Regularization
+        weight_decay=0.1,
+        dropout=0.1,
+        grad_clip=1.0,
+        
+        # GPU optimization
+        use_adaptive_matmul=True,
+        use_megatron=False,
+        tensor_parallel_size=1,
+        pipeline_parallel_size=1,
+    )

@@ -25,7 +25,7 @@ if __name__ == "__main__":
     sys.path.insert(0, parent_dir)
 
 # Import our modular components
-from configs import AdaptiveMoEModelConfig, get_rtx4090_config, get_rtx5090_config, get_development_config
+from configs import AdaptiveMoEModelConfig, get_rtx4090_config, get_rtx5090_config, get_development_config, get_rtx4090_maximum_config, get_rtx4090_maximum_longer_sequences
 from data import load_and_cache_data, TextTokenDataset
 from models import AdaptiveMoEMinimalLLM, create_model
 from training import train_model, validate_training_setup
@@ -44,7 +44,7 @@ def parse_arguments():
         "--config", 
         type=str, 
         default="default",
-        choices=["default", "dev", "rtx4090", "rtx5090"],
+        choices=["default", "dev", "rtx4090", "rtx5090", "rtx4090_max", "rtx4090_max_seq"],
         help="Configuration preset to use"
     )
     
@@ -87,6 +87,10 @@ def get_config(args):
         config = get_rtx4090_config()
     elif args.config == "rtx5090":
         config = get_rtx5090_config()
+    elif args.config == "rtx4090_max":
+        config = get_rtx4090_maximum_config()
+    elif args.config == "rtx4090_max_seq":
+        config = get_rtx4090_maximum_longer_sequences()
     else:
         config = AdaptiveMoEModelConfig()
     
