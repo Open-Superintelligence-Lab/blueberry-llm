@@ -1,0 +1,27 @@
+ARCHITECTURAL EXPERIMENT ANALYSIS
+==================================================
+
+EXPERIMENT RANKINGS (by Validation Loss):
+--------------------------------------------------
+ 1. SmallBatch      | Loss: 6.7803 | Acc: 0.1602 | Time: 1.8min
+ 2. Deeper          | Loss: 7.2196 | Acc: 0.1632 | Time: 3.1min
+ 3. Baseline        | Loss: 7.2204 | Acc: 0.1555 | Time: 2.1min
+ 4. MoreExperts     | Loss: 7.2210 | Acc: 0.1570 | Time: 3.0min
+ 5. Top3Experts     | Loss: 7.2596 | Acc: 0.1600 | Time: 2.1min
+ 6. LowDropout      | Loss: 7.2654 | Acc: 0.1617 | Time: 2.1min
+ 7. Wider           | Loss: 7.4342 | Acc: 0.1503 | Time: 2.1min
+ 8. HighLR          | Loss: 7.5273 | Acc: 0.1606 | Time: 2.1min
+ 9. LongSeq         | Loss: 7.5511 | Acc: 0.1507 | Time: 2.2min
+
+BEST EXPERIMENT: SmallBatch
+Validation Loss: 6.7803
+Validation Accuracy: 0.1602
+Training Time: 1.8 minutes
+
+KEY INSIGHTS:
+--------------------------------------------------
+• Best performing experiment: SmallBatch
+• Worst performing experiment: LongSeq
+• Performance improvement: 0.7709 loss reduction
+• Fastest training: SmallBatch (1.8 min)
+• Slowest training: Deeper (3.1 min)
