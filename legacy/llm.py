@@ -495,6 +495,12 @@ class MoEMinimalLLM(nn.Module):
 
         self.apply(self._init_weights)
 
+        # Depth-aware init "https://medium.com/@hosseinlack123/unlocking-transformer-learning-weight-dispersion-and-a-novel-depth-aware-initialization-strategy-6e43dddb10a4"
+        for i, block in enumerate(self.transformer_blocks):
+            std = 0.04 - (i / (config.n_layers - 1)) * 0.04 if config.n_layers > 1 else 0.02
+            for i, expert in enumerate(block.feed_forward.experts):
+              torch.nn.init.normal_(expert.linear2.weight, mean=0.0, std=std)
+
     def _init_weights(self, module):
         
         if hasattr(module, 'ZERO_INIT'):
