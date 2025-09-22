@@ -1,8 +1,8 @@
-# Blueberry LLM 🫐 - T4 Optimized
+# Blueberry LLM 🫐
 
-A Tesla T4 GPU-optimized Mixture of Experts (MoE) language model implementation.
+A Mixture of Experts (MoE) language model implementation.
 
-**Goal: Make LLM training accessible on T4 GPUs** - optimized specifically for Tesla T4 GPU performance with automatic configuration and hardware optimization to create state of the art LLM on single T4 GPU.
+**Goal: Make LLM training accessible to everyone** - anyone, regardless of technical background, can train SOTA language models on any GPU setup (1-1M GPUs) with automatic best settings and hardware optimization to create state of the art LLM.
 
 ## Quick Start
 
@@ -21,22 +21,19 @@ Try it on [Google Colab](https://colab.research.google.com/drive/1UE82keuNStPPae
 # python core/train.py --config dev --max-steps 500
 # I think this doesn't work, line above
 
-# Single T4 GPU training (optimized)
-python train.py
+# Use Megatron for distributed training (optional)
+python core/train_auto.py --use-megatron
 ```
 
-Optimized for **single Tesla T4 GPU** training with native PyTorch implementation. Megatron-LM disabled as it's designed for multi-GPU distributed training.
+Integrates **NVIDIA's Megatron-LM** for massive GPU cluster training, native PyTorch used for smaller setups. Manual choice still needed, more testing needed.
 
-## 🖥️ T4 GPU Optimization
+## 🖥️ Autotuned GPU Setups
 
-Blueberry LLM is specifically optimized for Tesla T4 GPU performance:
+Blueberry LLM automatically detects your hardware and optimizes configuration for maximum performance:
 
-| GPU | Memory | Status | Optimization | Notes |
-|-----|--------|--------|-------------|-------|
-| **Tesla T4** (Google Colab) | 16GB | ✅ **Fully Optimized** | ✅ FP16 Tensor Cores | Max memory utilization (~13-14GB) |
-| **Tesla T4** (Cloud/AWS) | 16GB | ✅ **Fully Optimized** | ✅ FP16 Tensor Cores | Single GPU training optimized |
-
-**Note**: This version is optimized specifically for T4 GPUs. Other GPU types may work but are not optimized.
+| GPU | Memory | Status | Auto-Optimization | Notes |
+|-----|--------|--------|------------------|-------|
+| **Tesla T4** (Google Colab) | 16GB | ✅ **Fully Supported** | ✅ Optimized | Max memory utilization (~13-14GB) |
 
 ---
 
@@ -47,9 +44,10 @@ This is an **open research project** - we encourage everyone to fork the project
 ```
 blueberry-llm/
 ├── 📁 core/                    # Main functionality
-│   ├── train.py               # T4-optimized training
+│   ├── train.py               # Main training script
+│   ├── train_auto.py          # Auto-configuration training
 │   ├── inference.py           # Model inference
-│   └── t4_config.py           # T4-specific configuration logic
+│   └── auto_config.py         # Auto-configuration logic
 ├── 📁 models/                 # Neural network components
 ├── 📁 data/                   # Data pipeline
 ├── 📁 optimizers/             # Advanced optimizers
@@ -113,4 +111,4 @@ We welcome contributions! Fork the repo, experiment with different architectures
 
 ## Vision
 
-Any company or person (even with no technical experience) should be able to download this repository and run it on their Tesla T4 GPU setup. The system will automatically detect your T4 GPU configuration, tune hyperparameters for optimal T4 performance, and run the best possible training with or without manual configuration from your side.
+Any company or person (even with no technical experience) should be able to download this repository and run it on their GPU setup - from 1 GPU to 1 million GPUs. The system will be able to automatically detect your hardware configuration, tune hyperparameters for optimal performance, and run the best possible training with or without manual configuration from your side.

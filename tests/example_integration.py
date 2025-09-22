@@ -42,8 +42,8 @@ class AdaptiveLinear(nn.Module):
         # Use optimal initialization based on architecture
         config = SYSTEM_CONFIG
         
-        if config.architecture == "t4":
-            # T4-optimized initialization
+        if config.architecture == "blackwell":
+            # Blackwell-optimized initialization
             std = 0.5 * (self.in_features ** -0.5)
             bound = (3 ** 0.5) * std
             nn.init.uniform_(self.weight, -bound, bound)
@@ -86,8 +86,8 @@ class AdaptiveAttention(nn.Module):
         
         # Scale factor (architecture-dependent)
         config = SYSTEM_CONFIG
-        if config.architecture == "t4":
-            self.scale = 0.12  # Optimized for T4
+        if config.architecture == "blackwell":
+            self.scale = 0.12  # Optimized for Blackwell
         else:
             self.scale = 1.0 / (self.d_k ** 0.5)  # Standard scaling
     

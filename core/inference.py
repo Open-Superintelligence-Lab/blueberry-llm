@@ -10,7 +10,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import torch
 import torch.nn.functional as F
 from legacy.llm import MoEMinimalLLM, MoEModelConfig
-from core.t4_config import AutoConfig
+from core.auto_config import AutoConfig
 from transformers import AutoTokenizer
 import argparse
 
@@ -144,7 +144,7 @@ def main():
         model, tokenizer, device, config = load_model(args.checkpoint)
     except FileNotFoundError:
         print(f"❌ Model file '{args.checkpoint}' not found!")
-        print("💡 Make sure you've trained a model first with: python3 train.py")
+        print("💡 Make sure you've trained a model first with: python3 train_auto.py")
         return
     except Exception as e:
         print(f"❌ Failed to load model: {e}")

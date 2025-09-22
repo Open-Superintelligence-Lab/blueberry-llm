@@ -33,14 +33,14 @@ fi
 # Test auto-configuration
 echo ""
 echo "🔧 Testing auto-configuration..."
-python3 core/t4_config.py
+python3 core/auto_config.py
 
 echo ""
 echo "🚀 Setup complete! Ready to train:"
 echo "   python3 train.py"
 echo ""
 echo "📊 To see configuration only:"
-echo "   python3 core/t4_config.py"
+echo "   python3 core/auto_config.py"
 echo ""
 echo "🧪 To run tests:"
 echo "   python3 test.py"

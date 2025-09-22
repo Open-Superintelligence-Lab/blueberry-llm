@@ -1,29 +1,29 @@
 """
-T4-optimized LLM model architectures.
+Main adaptive LLM model architectures.
 
-This module contains complete model implementations optimized for
-single Tesla T4 GPU training with FP16 precision.
+This module contains complete model implementations that compose
+the basic layers and components into full LLM architectures.
 """
 
 import torch
 import torch.nn as nn
 import math
 from typing import Optional, Tuple
-# Removed adaptive layer imports - using standard PyTorch components for T4
+from .layers import AdaptiveEmbedding, AdaptiveLinear, AdaptiveLayerNorm, create_adaptive_linear
 from .components import MoETransformerBlock, StandardTransformerBlock
-from configs import T4MoEModelConfig
+from configs import AdaptiveMoEModelConfig
 from system import SYSTEM_CONFIG
 
 
-class T4MoEMinimalLLM(nn.Module):
+class AdaptiveMoEMinimalLLM(nn.Module):
     """
-    T4-optimized MoE LLM with FP16 precision.
+    GPU-adaptive MoE LLM with automatic optimization.
     
-    This model is specifically optimized for Tesla T4 GPU training
-    with FP16 precision and tensor core acceleration.
+    This model automatically adapts to the available GPU hardware,
+    using optimizations like FP8 precision on Blackwell GPUs.
     """
     
-    def __init__(self, config: T4MoEModelConfig):
+    def __init__(self, config: AdaptiveMoEModelConfig):
         """
         Initialize the adaptive MoE LLM.
         
@@ -33,16 +33,17 @@ class T4MoEMinimalLLM(nn.Module):
         super().__init__()
         self.config = config
 
-        # Token embeddings optimized for T4
-        self.token_embedding = nn.Embedding(
+        # Token embeddings with adaptive initialization
+        self.token_embedding = AdaptiveEmbedding(
             config.vocab_size, 
-            config.d_model
+            config.d_model,
+            init_method="auto"
         )
         
         # Position dropout
         self.position_dropout = nn.Dropout(config.dropout)
 
-        # Transformer blocks optimized for T4
+        # Transformer blocks with adaptive operations
         self.transformer_blocks = nn.ModuleList([
             MoETransformerBlock(
                 d_model=config.d_model,
@@ -52,25 +53,27 @@ class T4MoEMinimalLLM(nn.Module):
                 num_experts=config.num_experts,
                 top_k=config.expert_top_k,
                 dropout=config.dropout,
-                use_fp8=False  # T4 doesn't support FP8
+                use_fp8=config.use_fp8
             )
             for i in range(config.n_layers)
         ])
 
-        # Output layers optimized for T4
-        self.norm = nn.LayerNorm(config.d_model)
+        # Output layers
+        self.norm = AdaptiveLayerNorm(config.d_model, norm_type="rms")
         self.output_dropout = nn.Dropout(config.dropout)
 
-        # Language modeling head optimized for T4
+        # Language modeling head with adaptive operations
         # Tied with embeddings for parameter efficiency
-        self.lm_head = nn.Linear(
+        self.lm_head = create_adaptive_linear(
             config.d_model, 
             config.vocab_size, 
-            bias=False
+            bias=False, 
+            zero_init=True,  # Zero init from reference implementation
+            use_fp8=config.use_fp8
         )
         
         # Tie weights between embedding and output
-        self.lm_head.weight = self.token_embedding.weight
+        self.lm_head.weight = self.token_embedding.embedding.weight
 
         # Apply initialization
         self.apply(self._init_weights)
@@ -80,25 +83,23 @@ class T4MoEMinimalLLM(nn.Module):
 
     def _init_weights(self, module):
         """
-        Initialize model weights optimized for T4 GPU.
+        Initialize model weights with architecture-specific optimizations.
         
         Args:
             module: Module to initialize
         """
-        if isinstance(module, nn.Embedding):
-            # Standard embedding initialization
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
-        elif isinstance(module, nn.LayerNorm):
+        if isinstance(module, AdaptiveLinear):
+            # Weight initialization is handled in AdaptiveLinear
+            pass
+        elif isinstance(module, (AdaptiveEmbedding, nn.Embedding)):
+            # Embedding initialization is handled in AdaptiveEmbedding
+            pass
+        elif isinstance(module, (nn.LayerNorm, nn.RMSNorm)):
             # Standard normalization initialization
             if hasattr(module, 'bias') and module.bias is not None:
                 nn.init.zeros_(module.bias)
             if hasattr(module, 'weight') and module.weight is not None:
                 nn.init.ones_(module.weight)
-        elif isinstance(module, nn.Linear):
-            # Standard linear layer initialization
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            if module.bias is not None:
-                nn.init.zeros_(module.bias)
 
     def _print_model_info(self):
         """Print model information and optimizations."""
@@ -121,8 +122,13 @@ class T4MoEMinimalLLM(nn.Module):
         print(f"   Parameter efficiency: {active_params/total_params:.1%} active per forward pass")
         
         # GPU optimizations
-        if self.config.use_fp16_matmul:
-            print(f"   ⚡ FP16 matmul operations enabled for T4")
+        if self.config.use_fp8 and SYSTEM_CONFIG.has_fp8_support:
+            print(f"   🚀 FP8 acceleration enabled")
+        elif SYSTEM_CONFIG.has_bf16_support:
+            print(f"   🚀 BF16 acceleration enabled")
+        
+        if self.config.use_adaptive_matmul:
+            print(f"   ⚡ Adaptive matmul operations enabled")
 
     def forward(
         self, 
@@ -208,8 +214,8 @@ class T4MoEMinimalLLM(nn.Module):
         
         # A100 GPU bfloat16 peak flops is 312 TFLOPS
         flops_promised = 312e12
-        if SYSTEM_CONFIG.architecture == "t4":
-            # T4 has balanced FLOPS and memory
+        if SYSTEM_CONFIG.architecture == "blackwell":
+            # RTX 5090 has higher peak FLOPS
             flops_promised = 400e12  # Estimated
         
         mfu = flops_achieved / flops_promised
@@ -276,14 +282,14 @@ class T4MoEMinimalLLM(nn.Module):
         return input_ids
 
 
-class T4StandardLLM(nn.Module):
+class AdaptiveStandardLLM(nn.Module):
     """
     Standard transformer LLM without MoE, but with GPU adaptations.
     
     This provides a simpler baseline model for comparison with MoE.
     """
     
-    def __init__(self, config: T4MoEModelConfig):
+    def __init__(self, config: AdaptiveMoEModelConfig):
         """
         Initialize the adaptive standard LLM.
         
@@ -294,7 +300,7 @@ class T4StandardLLM(nn.Module):
         self.config = config
 
         # Token embeddings
-        self.token_embedding = T4Embedding(
+        self.token_embedding = AdaptiveEmbedding(
             config.vocab_size, 
             config.d_model,
             init_method="auto"
@@ -317,11 +323,11 @@ class T4StandardLLM(nn.Module):
         ])
 
         # Output layers
-        self.norm = T4LayerNorm(config.d_model, norm_type="rms")
+        self.norm = AdaptiveLayerNorm(config.d_model, norm_type="rms")
         self.output_dropout = nn.Dropout(config.dropout)
 
         # Language modeling head
-        self.lm_head = create_t4_linear(
+        self.lm_head = create_adaptive_linear(
             config.d_model, 
             config.vocab_size, 
             bias=False, 
@@ -337,10 +343,10 @@ class T4StandardLLM(nn.Module):
 
     def _init_weights(self, module):
         """Initialize model weights."""
-        if isinstance(module, T4Linear):
-            pass  # Handled in T4Linear
-        elif isinstance(module, (T4Embedding, nn.Embedding)):
-            pass  # Handled in T4Embedding
+        if isinstance(module, AdaptiveLinear):
+            pass  # Handled in AdaptiveLinear
+        elif isinstance(module, (AdaptiveEmbedding, nn.Embedding)):
+            pass  # Handled in AdaptiveEmbedding
         elif isinstance(module, (nn.LayerNorm, nn.RMSNorm)):
             if hasattr(module, 'bias') and module.bias is not None:
                 nn.init.zeros_(module.bias)
@@ -374,7 +380,34 @@ class T4StandardLLM(nn.Module):
         return logits
 
 
-def create_model(config: T4MoEModelConfig, model_type: str = "moe") -> nn.Module:
+def should_use_megatron(config: AdaptiveMoEModelConfig) -> bool:
+    """
+    Determine if Megatron-LM should be used based on configuration and hardware.
+    
+    Args:
+        config: Model configuration
+        
+    Returns:
+        True if Megatron should be used, False for native backend
+    """
+    # Don't use Megatron if explicitly disabled
+    if not config.use_megatron:
+        return False
+    
+    # Only use Megatron with multiple GPUs
+    if torch.cuda.device_count() <= 1:
+        return False
+    
+    # Check if Megatron dependencies are available
+    try:
+        import megatron.core
+        return True
+    except ImportError:
+        print("⚠️ Megatron-LM not available, falling back to native backend")
+        return False
+
+
+def create_model(config: AdaptiveMoEModelConfig, model_type: str = "moe") -> nn.Module:
     """
     Factory function to create different model types.
     
@@ -385,11 +418,16 @@ def create_model(config: T4MoEModelConfig, model_type: str = "moe") -> nn.Module
     Returns:
         Model instance
     """
-    # Single T4 GPU - use native backend only
+    # Check if we should use Megatron backend
+    if should_use_megatron(config):
+        from .megatron_wrapper import create_megatron_model
+        return create_megatron_model(config, model_type)
+    
+    # Use native backend
     if model_type == "moe":
-        return T4MoEMinimalLLM(config)
+        return AdaptiveMoEMinimalLLM(config)
     elif model_type == "standard":
-        return T4StandardLLM(config)
+        return AdaptiveStandardLLM(config)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 

@@ -19,12 +19,12 @@ except ImportError:
     TORCHTUNE_AVAILABLE = False
 
 
-class T4Linear(nn.Module):
+class AdaptiveLinear(nn.Module):
     """
     GPU-adaptive linear layer that automatically uses the best matmul kernel.
     
     This layer replaces nn.Linear with an implementation that leverages
-    T4-optimized linear operations with FP16 precision.
+    architecture-specific optimizations like FP8 on Blackwell GPUs.
     """
     
     def __init__(
@@ -43,12 +43,12 @@ class T4Linear(nn.Module):
             out_features: Number of output features
             bias: Whether to include bias term
             use_fp8: Whether to use FP8 precision (only on supported hardware)
-            init_method: Weight initialization method ("auto", "t4", "standard")
+            init_method: Weight initialization method ("auto", "blackwell", "standard")
         """
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.use_fp8 = False  # T4 doesn't support FP8
+        self.use_fp8 = use_fp8 and SYSTEM_CONFIG.has_fp8_support
         self.init_method = init_method
         
         # Weight parameter
@@ -73,12 +73,12 @@ class T4Linear(nn.Module):
         """Initialize weights using optimal scaling for the current architecture."""
         if self.init_method == "auto":
             # Auto-select based on architecture
-            if SYSTEM_CONFIG.architecture == "t4":
-                self._t4_init()
+            if SYSTEM_CONFIG.architecture == "blackwell":
+                self._blackwell_init()
             else:
                 self._standard_init()
-        elif self.init_method == "t4":
-            self._t4_init()
+        elif self.init_method == "blackwell":
+            self._blackwell_init()
         elif self.init_method == "standard":
             self._standard_init()
         else:
@@ -88,8 +88,8 @@ class T4Linear(nn.Module):
         if self.bias is not None:
             nn.init.zeros_(self.bias)
     
-    def _t4_init(self):
-        """T4-optimized weight initialization."""
+    def _blackwell_init(self):
+        """Blackwell-optimized weight initialization."""
         # Improved initialization from the reference implementation
         std = 0.5 * (self.in_features ** -0.5)
         bound = (3 ** 0.5) * std
@@ -110,7 +110,7 @@ class T4Linear(nn.Module):
             Output tensor [batch_size, seq_len, out_features]
         """
         if self.use_fp8 and self.training:
-            # Use FP16 matmul for training on T4
+            # Use FP8 matmul for training on Blackwell
             output = matmul_fp8(
                 x, 
                 self.weight, 
@@ -182,9 +182,9 @@ class Rotary(nn.Module):
         return f'dim={self.dim}, max_seq_len={self.max_seq_len}, base={self.base}'
 
 
-class T4Embedding(nn.Module):
+class AdaptiveEmbedding(nn.Module):
     """
-    T4-optimized embedding layer with optimal initialization.
+    Adaptive embedding layer with optimal initialization.
     
     This embedding layer uses architecture-specific initialization
     and can be configured for different GPU architectures.
@@ -222,8 +222,8 @@ class T4Embedding(nn.Module):
     def _init_weights(self):
         """Initialize embedding weights."""
         if self.init_method == "auto":
-            if SYSTEM_CONFIG.architecture == "t4":
-                # T4-optimized initialization
+            if SYSTEM_CONFIG.architecture == "blackwell":
+                # Blackwell-optimized initialization
                 nn.init.normal_(self.embedding.weight, mean=0.0, std=0.02)
             else:
                 # Standard initialization
@@ -244,9 +244,9 @@ class T4Embedding(nn.Module):
         return self.embedding(input_ids)
 
 
-class T4LayerNorm(nn.Module):
+class AdaptiveLayerNorm(nn.Module):
     """
-    T4-optimized normalization layer that chooses between LayerNorm and RMSNorm.
+    Adaptive normalization layer that chooses between LayerNorm and RMSNorm.
     
     RMSNorm is often preferred for modern architectures as it's simpler
     and more efficient.
@@ -293,13 +293,13 @@ class T4LayerNorm(nn.Module):
         return f'normalized_shape={self.normalized_shape}, eps={self.eps}, type={self.norm_type}'
 
 
-def create_t4_linear(
+def create_adaptive_linear(
     in_features: int,
     out_features: int,
     bias: bool = True,
     zero_init: bool = False,
     use_fp8: bool = False
-) -> T4Linear:
+) -> AdaptiveLinear:
     """
     Factory function to create adaptive linear layers with common configurations.
     
@@ -311,9 +311,9 @@ def create_t4_linear(
         use_fp8: Whether to use FP8 precision
         
     Returns:
-        Configured T4Linear layer
+        Configured AdaptiveLinear layer
     """
-    layer = T4Linear(
+    layer = AdaptiveLinear(
         in_features, 
         out_features, 
         bias=bias, 

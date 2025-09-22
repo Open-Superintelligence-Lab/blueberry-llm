@@ -10,12 +10,12 @@ import torch.nn as nn
 import math
 from typing import List, Dict, Any, Callable
 from .muon import Muon, MuonWithWarmup
-from configs import T4MoEModelConfig
+from configs import AdaptiveMoEModelConfig
 
 
 def setup_optimizers(
     model: nn.Module, 
-    config: T4MoEModelConfig,
+    config: AdaptiveMoEModelConfig,
     use_warmup: bool = True
 ) -> List[torch.optim.Optimizer]:
     """
@@ -103,7 +103,7 @@ def setup_optimizers(
 
 def setup_parameter_groups(
     model: nn.Module,
-    config: T4MoEModelConfig
+    config: AdaptiveMoEModelConfig
 ) -> List[Dict[str, Any]]:
     """
     Setup parameter groups with different learning rates and weight decay.
@@ -160,7 +160,7 @@ def setup_parameter_groups(
 
 def get_lr_scheduler(
     optimizer: torch.optim.Optimizer,
-    config: T4MoEModelConfig,
+    config: AdaptiveMoEModelConfig,
     scheduler_type: str = "cosine_warmup"
 ) -> torch.optim.lr_scheduler.LRScheduler:
     """
@@ -186,7 +186,7 @@ def get_lr_scheduler(
 
 def get_cosine_warmup_scheduler(
     optimizer: torch.optim.Optimizer,
-    config: T4MoEModelConfig
+    config: AdaptiveMoEModelConfig
 ) -> torch.optim.lr_scheduler.LRScheduler:
     """
     Create cosine annealing scheduler with warmup.
@@ -220,7 +220,7 @@ def get_cosine_warmup_scheduler(
 
 def get_linear_warmup_scheduler(
     optimizer: torch.optim.Optimizer,
-    config: T4MoEModelConfig
+    config: AdaptiveMoEModelConfig
 ) -> torch.optim.lr_scheduler.LRScheduler:
     """
     Create linear warmup followed by linear decay scheduler.
@@ -332,7 +332,7 @@ def apply_weight_decay_exclusions(
 
 def create_single_optimizer(
     model: nn.Module,
-    config: T4MoEModelConfig,
+    config: AdaptiveMoEModelConfig,
     optimizer_type: str = "adamw"
 ) -> torch.optim.Optimizer:
     """

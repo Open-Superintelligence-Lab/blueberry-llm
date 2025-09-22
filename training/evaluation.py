@@ -12,13 +12,13 @@ from torch.utils.data import DataLoader
 from torch.amp import autocast
 import math
 from typing import Dict, Any, Optional
-from configs import T4MoEModelConfig
+from configs import AdaptiveMoEModelConfig
 
 
 def evaluate_model(
     model: nn.Module, 
     val_loader: DataLoader, 
-    config: T4MoEModelConfig,
+    config: AdaptiveMoEModelConfig,
     max_eval_steps: Optional[int] = None
 ) -> Dict[str, float]:
     """
@@ -234,7 +234,7 @@ def simple_generate(
 def compute_model_metrics(
     model: nn.Module,
     val_loader: DataLoader,
-    config: T4MoEModelConfig,
+    config: AdaptiveMoEModelConfig,
     compute_mfu: bool = False,
     dt: float = 1.0
 ) -> Dict[str, Any]:
@@ -297,7 +297,7 @@ def compute_model_metrics(
 def benchmark_model_speed(
     model: nn.Module,
     data_loader: DataLoader,
-    config: T4MoEModelConfig,
+    config: AdaptiveMoEModelConfig,
     num_iterations: int = 10
 ) -> Dict[str, float]:
     """

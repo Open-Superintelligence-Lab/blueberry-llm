@@ -37,7 +37,11 @@ def get_optimal_dtype_for_architecture() -> torch.dtype:
     """
     from system import SYSTEM_CONFIG
     
-    if SYSTEM_CONFIG.has_tensor_cores:
+    if SYSTEM_CONFIG.has_fp8_support:
+        return torch.float8_e4m3fn
+    elif SYSTEM_CONFIG.has_bf16_support:
+        return torch.bfloat16
+    elif SYSTEM_CONFIG.has_tensor_cores:
         return torch.float16
     else:
         return torch.float32

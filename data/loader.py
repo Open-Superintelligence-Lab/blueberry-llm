@@ -8,7 +8,7 @@ to avoid reprocessing on subsequent runs.
 import os
 import pickle
 from typing import List, Tuple, Any
-from configs import T4MoEModelConfig
+from configs import AdaptiveMoEModelConfig
 
 # Optional imports - will be imported when needed
 try:
@@ -31,7 +31,7 @@ except ImportError:
 
 
 def load_and_cache_data(
-    config: T4MoEModelConfig, 
+    config: AdaptiveMoEModelConfig, 
     cache_dir: str = "data_cache"
 ) -> Tuple[List[str], AutoTokenizer, List[int]]:
     """

@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Optional
-from .layers import T4Linear, Rotary, T4LayerNorm, create_t4_linear
+from .layers import AdaptiveLinear, Rotary, AdaptiveLayerNorm, create_adaptive_linear
 from system import SYSTEM_CONFIG
 
 
@@ -51,10 +51,10 @@ class MultiHeadAttention(nn.Module):
         assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
 
         # QKV projection using adaptive linear layers
-        self.qkv = T4Linear(d_model, d_model * 3, bias=False, use_fp8=use_fp8)
+        self.qkv = AdaptiveLinear(d_model, d_model * 3, bias=False, use_fp8=use_fp8)
         
         # Output projection with zero initialization (from reference implementation)
-        self.w_o = create_t4_linear(d_model, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
+        self.w_o = create_adaptive_linear(d_model, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
         
         # Rotary positional embedding
         self.rotary = Rotary(self.d_k, max_seq_len)
@@ -65,8 +65,8 @@ class MultiHeadAttention(nn.Module):
         # Attention scaling - use architecture-specific values
         if attention_scale is not None:
             self.attention_scale = attention_scale
-        elif SYSTEM_CONFIG.architecture == "t4":
-            # Optimized scaling for T4 (from reference implementation)
+        elif SYSTEM_CONFIG.architecture == "blackwell":
+            # Optimized scaling for Blackwell (from reference implementation)
             self.attention_scale = 0.12
         else:
             # Standard scaling
@@ -142,8 +142,8 @@ class Expert(nn.Module):
         self.activation = activation
         
         # Two-layer MLP with adaptive operations
-        self.linear1 = T4Linear(d_model, d_ff, bias=False, use_fp8=use_fp8)
-        self.linear2 = create_t4_linear(d_ff, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
+        self.linear1 = AdaptiveLinear(d_model, d_ff, bias=False, use_fp8=use_fp8)
+        self.linear2 = create_adaptive_linear(d_ff, d_model, bias=False, zero_init=True, use_fp8=use_fp8)
         self.dropout = nn.Dropout(dropout)
         
         # Choose activation function
@@ -208,7 +208,7 @@ class TopKRouter(nn.Module):
         self.noise_std = noise_std
         
         # Gating network
-        self.gate = T4Linear(d_model, num_experts, bias=False, use_fp8=use_fp8)
+        self.gate = AdaptiveLinear(d_model, num_experts, bias=False, use_fp8=use_fp8)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -385,6 +385,7 @@ class MoETransformerBlock(nn.Module):
         num_experts: int = 8,
         top_k: int = 2,
         dropout: float = 0.1,
+        use_fp8: bool = False,
         norm_type: str = "rms"
     ):
         """
@@ -398,23 +399,24 @@ class MoETransformerBlock(nn.Module):
             num_experts: Number of experts in MoE layer
             top_k: Number of experts to route to per token
             dropout: Dropout probability
+            use_fp8: Whether to use FP8 precision
             norm_type: Type of normalization ("rms", "layer")
         """
         super().__init__()
 
-        # Attention layer optimized for T4
+        # Attention layer with adaptive operations
         self.attention = MultiHeadAttention(
-            d_model, n_heads, max_seq_len, dropout
+            d_model, n_heads, max_seq_len, dropout, use_fp8=use_fp8
         )
 
-        # MoE layer optimized for T4
+        # MoE layer with adaptive operations
         self.feed_forward = MixtureOfExperts(
-            d_model, d_ff, num_experts, top_k, dropout
+            d_model, d_ff, num_experts, top_k, dropout, use_fp8=use_fp8
         )
 
         # Normalization layers
-        self.norm1 = T4LayerNorm(d_model, norm_type=norm_type)
-        self.norm2 = T4LayerNorm(d_model, norm_type=norm_type)
+        self.norm1 = AdaptiveLayerNorm(d_model, norm_type=norm_type)
+        self.norm2 = AdaptiveLayerNorm(d_model, norm_type=norm_type)
         
         # Dropout
         self.dropout = nn.Dropout(dropout)
@@ -487,8 +489,8 @@ class StandardTransformerBlock(nn.Module):
         )
 
         # Normalization layers
-        self.norm1 = T4LayerNorm(d_model, norm_type=norm_type)
-        self.norm2 = T4LayerNorm(d_model, norm_type=norm_type)
+        self.norm1 = AdaptiveLayerNorm(d_model, norm_type=norm_type)
+        self.norm2 = AdaptiveLayerNorm(d_model, norm_type=norm_type)
         
         # Dropout
         self.dropout = nn.Dropout(dropout)
