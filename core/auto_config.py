@@ -77,7 +77,7 @@ class BlueberryAutoConfigurator:
                 'num_experts': 8, 'batch_size': 16, 'max_seq_len': 1024
             }
             gradient_accumulation_steps = 4  # Balanced for larger batch size
-            max_steps = 1500  # More training steps for larger model
+            max_steps = 2000  # More training steps for larger model
         else:
             # Default configuration for other GPUs
             config = {
@@ -85,7 +85,7 @@ class BlueberryAutoConfigurator:
                 'num_experts': 6, 'batch_size': 16, 'max_seq_len': 1024
             }
             gradient_accumulation_steps = max(1, config['batch_size'] // 4)
-            max_steps = 1500
+            max_steps = 2000
         
         return AutoConfig(
             num_gpus=num_gpus,
@@ -110,7 +110,7 @@ class BlueberryAutoConfigurator:
             num_experts=6,  # Increased from 4
             batch_size=16,  
             gradient_accumulation_steps=4,  # 16 * 4 = 64
-            max_steps=1500, 
+            max_steps=2000, 
             learning_rate=0.01,
             max_seq_len=512,
             use_distributed=(num_gpus > 1),
@@ -123,7 +123,7 @@ class BlueberryAutoConfigurator:
         return AutoConfig(
             num_gpus=0, gpu_memory_gb=0,
             d_model=128, n_layers=2, n_heads=4, num_experts=2,
-            batch_size=4, gradient_accumulation_steps=8, max_steps=1000,
+            batch_size=4, gradient_accumulation_steps=8, max_steps=500,
             learning_rate=0.001, max_seq_len=256,
             use_distributed=False, use_amp=False, use_megatron=False
         )

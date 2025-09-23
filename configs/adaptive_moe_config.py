@@ -23,11 +23,11 @@ class AdaptiveMoEModelConfig:
     d_model: int = 384
     n_heads: int = 8
     n_kv_heads: int = field(init=False)
-    n_layers: int = 6
+    n_layers: int = 8
     d_ff: int = field(init=False)
     multiple_of: int = 128
-    batch_size: int = 24
-    max_steps: int = 1000
+    batch_size: int = 12
+    max_steps: int = 2000
 
     # Training parameters
     gradient_accumulation_steps: int = 4
@@ -35,7 +35,7 @@ class AdaptiveMoEModelConfig:
 
     # Data parameters
     max_seq_len: int = 512
-    max_tokens: int = 500000
+    max_tokens: int = -1
     dataset_name: str = "Hosseinlack123/PicoLM-dataset"
 
     # Evaluation

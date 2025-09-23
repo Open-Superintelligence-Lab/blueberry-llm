@@ -41,7 +41,7 @@ class MoEModelConfig:
     d_ff: int = field(init=False)
     multiple_of: int = 128
     batch_size: int = 16
-    max_steps: int = 1500
+    max_steps: int = 2000
 
     # Training parameters
     gradient_accumulation_steps: int = 4

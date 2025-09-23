@@ -23,7 +23,7 @@ class T4SpeedrunConfig(AdaptiveMoEModelConfig):
     n_layers: int = 8
     d_ff: int = field(init=False)
     batch_size: int = 16
-    max_steps: int = 1500
+    max_steps: int = 2000
     max_seq_len: int = 512
     num_documents: int = 1000
     max_tokens: int = 100000
