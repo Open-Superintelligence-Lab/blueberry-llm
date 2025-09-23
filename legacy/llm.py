@@ -155,7 +155,7 @@ def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
         tokenizer.pad_token = tokenizer.eos_token
 
     # Load dataset
-    dataset = load_dataset({config.dataset_name}, token=False)['train']
+    dataset = load_dataset(config.dataset_name, token=False)['train']
     
     texts = []
     for i, item in enumerate(dataset):
