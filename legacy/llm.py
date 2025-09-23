@@ -50,6 +50,7 @@ class MoEModelConfig:
     # Data parameters
     max_seq_len: int = 512
     max_tokens: int = -1 # set to -1 to include all tokens
+    dataset_name: str = "Hosseinlack123/PicoLM-dataset"
 
     # Evaluation
     eval_every: int = 500
@@ -130,7 +131,7 @@ class Muon(torch.optim.Optimizer):
 def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
     """Load and cache tokenized data to avoid reprocessing"""
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f"{cache_dir}/tokenized_data_{config.max_tokens}.pkl"
+    cache_file = f"{cache_dir}/tokenized_{config.dataset_name.split('/')[-1]}_{config.max_tokens}.pkl"
 
     # Check if cached data exists
     if os.path.exists(cache_file):
@@ -154,7 +155,7 @@ def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
         tokenizer.pad_token = tokenizer.eos_token
 
     # Load dataset
-    dataset = load_dataset("Hosseinlack123/PicoLM-dataset", token=False)['train']
+    dataset = load_dataset({config.dataset_name}, token=False)['train']
     
     texts = []
     for i, item in enumerate(dataset):

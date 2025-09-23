@@ -45,7 +45,7 @@ def load_and_cache_data(
         Tuple of (texts, tokenizer, tokens)
     """
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f"{cache_dir}/tokenized_data_{config.max_tokens}.pkl"
+    cache_file = f"{cache_dir}/tokenized_{config.dataset_name.split('/')[-1]}_{config.max_tokens}.pkl"
 
     # Check if cached data exists
     if os.path.exists(cache_file):
@@ -95,7 +95,9 @@ def _load_tokenizer():
     return tokenizer
 
 
-def _load_documents() -> List[str]:
+def _load_documents(
+    config: AdaptiveMoEModelConfig
+    ) -> List[str]:
     """
     Load documents from the dataset.
             
@@ -108,7 +110,7 @@ def _load_documents() -> List[str]:
     
     # Load dataset
     dataset = load_dataset(
-        "Hosseinlack123/PicoLM-dataset", 
+        config.dataset_name, 
         token=False
     )['train']
     

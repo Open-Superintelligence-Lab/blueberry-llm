@@ -36,6 +36,7 @@ class AdaptiveMoEModelConfig:
     # Data parameters
     max_seq_len: int = 512
     max_tokens: int = 500000
+    dataset_name: str = "Hosseinlack123/PicoLM-dataset"
 
     # Evaluation
     eval_every: int = 500
