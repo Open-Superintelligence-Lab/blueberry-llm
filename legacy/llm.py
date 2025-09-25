@@ -601,12 +601,12 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
 
 
 def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader: DataLoader):
-    """Train the model with Muon optimizer"""
-    print(f"\n Training Small model with Muon optimizer")
+    """Train the MoE model"""
+    print(f"\n🚀 Training MoE model with {config.num_experts} experts (top-{config.expert_top_k})")
 
     # Initialize model
     set_seed(1337)
-    model = PicoLM(config)
+    model = MoEMinimalLLM(config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
 
