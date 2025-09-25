@@ -57,7 +57,7 @@ class MultiHeadAttention(nn.Module):
         assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
 
         # QKV projection using adaptive linear layers
-        self.qkv = AdaptiveLinear(d_model, total_qkv_dim, bias=False, use_fp8=use_fp8)
+        self.qkv = AdaptiveLinear(d_model, total_qkv_dim, bias=True, use_fp8=use_fp8)
         
         # Output projection with zero initialization (from reference implementation)
         self.w_o = create_adaptive_linear(d_model, d_model, bias=False, zero_init=True, use_fp8=use_fp8)

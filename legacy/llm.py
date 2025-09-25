@@ -225,7 +225,7 @@ class MultiHeadAttention(nn.Module):
         total_qkv_dim = (self.n_heads + (2 * self.n_kv_heads)) * self.d_k
         
 
-        self.qkv = nn.Linear(d_model, total_qkv_dim, bias=False)
+        self.qkv = nn.Linear(d_model, total_qkv_dim, bias=True)
         self.w_o = nn.Linear(d_model, d_model, bias=False)
         self.w_o.ZERO_INIT = 1
         
