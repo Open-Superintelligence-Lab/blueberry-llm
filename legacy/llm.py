@@ -605,7 +605,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     print(f"\n🚀 Training MoE model with {config.num_experts} experts (top-{config.expert_top_k})")
 
     # Initialize model
-    set_seed(42)
+    set_seed(1337)
     model = MoEMinimalLLM(config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
