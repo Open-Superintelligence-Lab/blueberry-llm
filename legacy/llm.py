@@ -601,25 +601,19 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
 
 
 def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader: DataLoader):
-    """Train the MoE model"""
-    print(f"\n🚀 Training MoE model with {config.num_experts} experts (top-{config.expert_top_k})")
+    """Train the model with Muon optimizer"""
+    print(f"\n Training Small model with Muon optimizer")
 
     # Initialize model
-    set_seed(42)
-    model = MoEMinimalLLM(config)
+    set_seed(1337)
+    model = PicoLM(config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
 
-    # Count parameters
-    total_params = sum(p.numel() for p in model.parameters())
-    active_params = sum(p.numel() for n, p in model.named_parameters()
-                       if 'expert' not in n)
-    expert_params = total_params - active_params
+    model_compiled  = torch.compile(model) 
 
-    print(f"  📊 Total parameters: {total_params:,}")
-    print(f"  📊 Active parameters: {active_params:,}")
-    print(f"  📊 Expert parameters: {expert_params:,}")
-    print(f"  📊 Parameter efficiency: {active_params/total_params:.1%} active per forward pass")
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"   Total parameters: {total_params:,}")
 
     # Setup optimizers
     optimizers = setup_muon_optimizer(model, config)
@@ -627,16 +621,16 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     # Learning rate schedule
     schedulers = []
     for optimizer in optimizers:
-        warmup_steps = int(config.max_steps * 0.06) # ~6.0%
-        milestone_1 = int(config.max_steps * 0.8)
-        milestone_2 = int(config.max_steps * 0.9)
+        warmup_steps = int(config.max_steps * 0.06)
+        milestone1 = int(config.max_steps * 0.8)
+        milestone2 = int(config.max_steps * 0.9)
         
         def lr_lambda(step):
             if step < warmup_steps:
                 return float(step) / float(max(1, warmup_steps))
-            elif step < milestone_1:
+            elif step < milestone1:
                 return 1
-            elif step < milestone_2:
+            elif step < milestone2:
                 return 0.316
             else:
                 return 0.1
@@ -646,48 +640,57 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
 
     scaler = GradScaler() if config.use_amp else None
 
+    # Initialize lists to store losses
+    train_losses = []
+    val_losses = []
+
+    # Compute initial validation and train loss
+    model_compiled.eval()
+    initial_eval = evaluate_model(model_compiled, val_loader, config)
+    val_losses.append(initial_eval['val_loss'])
+    print(f"\nInitial Val Loss: {initial_eval['val_loss']:.4f}, "
+          f"Val Acc: {initial_eval['val_accuracy']:.4f}, "
+          f"Val PPL: {initial_eval['val_perplexity']:.2f}")
+
+    # Compute initial train loss using evaluate_model
+    initial_train_eval = evaluate_model(model_compiled, train_loader, config)
+    train_losses.append(initial_train_eval['val_loss'])
+    print(f"Initial Train Loss: {initial_train_eval['val_loss']:.4f}")
+
     # Training loop
-    model.train()
+    model_compiled.train()
     step = 0
-    pbar = tqdm(total=config.max_steps, desc="Training MoE")
+    start_time = time.time()
+    best_val_loss = float('inf')
+
+    pbar = tqdm(total=config.max_steps, desc="Training")
 
     while step < config.max_steps:
         for batch_idx, (x, y) in enumerate(train_loader):
             if step >= config.max_steps:
                 break
-
+        
             x, y = x.to(device), y.to(device)
 
-            # Forward pass
+            # Forward pass with gradient accumulation
             if config.use_amp:
                 with autocast():
-                    logits, aux_loss = model(x, return_aux_loss=True)
-                    ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
-
-                    # Combine main loss and auxiliary loss
-                    total_loss = ce_loss
-                    if aux_loss is not None:
-                        total_loss = total_loss + aux_loss
-
-                    loss = total_loss / config.gradient_accumulation_steps
+                    logits = model_compiled(x)
+                    loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
+                    loss = loss / config.gradient_accumulation_steps
                 scaler.scale(loss).backward()
             else:
-                logits, aux_loss = model(x, return_aux_loss=True)
-                ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
-
-                total_loss = ce_loss
-                if aux_loss is not None:
-                    total_loss = total_loss + aux_loss
-
-                loss = total_loss / config.gradient_accumulation_steps
+                logits = model_compiled(x)
+                loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
+                loss = loss / config.gradient_accumulation_steps
                 loss.backward()
 
-            # Optimizer step
+            # Optimizer step after accumulation
             if (step + 1) % config.gradient_accumulation_steps == 0:
                 if config.use_amp:
                     for optimizer in optimizers:
                         scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                    grad_norm = torch.nn.utils.clip_grad_norm_(model_compiled.parameters(), config.grad_clip)
 
                     for optimizer in optimizers:
                         scaler.step(optimizer)
@@ -696,7 +699,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                         scheduler.step()
                     scaler.update()
                 else:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                    grad_norm = torch.nn.utils.clip_grad_norm_(model_compiled.parameters(), config.grad_clip)
                     for optimizer in optimizers:
                         optimizer.step()
                         optimizer.zero_grad()
@@ -708,12 +711,11 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                 with torch.no_grad():
                     predictions = logits.argmax(dim=-1)
                     accuracy = (predictions == y).float().mean().item()
-                    current_loss = ce_loss.item()
+                    current_loss = loss.item() * config.gradient_accumulation_steps
                     perplexity = math.exp(min(current_loss, 20))
 
                 pbar.set_postfix({
                     'loss': f'{current_loss:.4f}',
-                    'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
                     'ppl': f'{perplexity:.1f}',
                     'lr': f'{optimizers[0].param_groups[0]["lr"]:.2e}'
@@ -721,28 +723,43 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
 
             # Evaluation
             if step % config.eval_every == 0 and step > 0:
-                eval_metrics = evaluate_model(model, val_loader, config)
+                model_compiled.eval()
+                eval_metrics = evaluate_model(model_compiled, val_loader, config)
+                val_losses.append(eval_metrics['val_loss'])
+                train_eval_metrics = evaluate_model(model_compiled, train_loader, config)
+                train_losses.append(train_eval_metrics['val_loss'])
                 print(f"\nStep {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
+                      f"Train Loss: {train_eval_metrics['val_loss']:.4f}, "
                       f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
                       f"Val PPL: {eval_metrics['val_perplexity']:.2f}")
+                model_compiled.train()
 
-            # Milestone evaluations
-            if step in getattr(config, 'log_milestones', ()):    
-                eval_metrics = evaluate_model(model, val_loader, config)
-                print(f"\n🧪 Milestone {step}: Val Loss: {eval_metrics['val_loss']:.4f}")
+                if eval_metrics['val_loss'] < best_val_loss:
+                    best_val_loss = eval_metrics['val_loss']
 
             step += 1
-            if step % 20 == 0:
-                pbar.update(20)
+            if step % 50 == 0:
+                pbar.update(50)
 
     pbar.close()
 
+    training_time = time.time() - start_time
+    print(f"   Training completed in {training_time:.1f} seconds")
+
     # Final evaluation
-    final_eval = evaluate_model(model, val_loader, config)
-    print(f"\n📊 Final Results:")
-    print(f"   Val Loss: {final_eval['val_loss']:.4f}")
-    print(f"   Val Accuracy: {final_eval['val_accuracy']:.4f}")
-    print(f"   Val Perplexity: {final_eval['val_perplexity']:.2f}")
+    model_compiled.eval()
+    final_eval = evaluate_model(model_compiled, val_loader, config)
+    final_train_eval = evaluate_model(model_compiled, train_loader, config)
+    val_losses.append(final_eval['val_loss'])
+    train_losses.append(final_train_eval['val_loss'])
+    print(f"   Final - Val Loss: {final_eval['val_loss']:.4f}, "
+          f"Train Loss: {final_train_eval['val_loss']:.4f}, "
+          f"Val Acc: {final_eval['val_accuracy']:.4f}, "
+          f"Val PPL: {final_eval['val_perplexity']:.2f}")
+
+    # Print stored losses
+    print("\n Train Losses:", [f"{x:.4f}" for x in train_losses])
+    print(" Validation Losses:", [f"{x:.4f}" for x in val_losses])
 
     return model, final_eval
 
