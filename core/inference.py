@@ -32,7 +32,7 @@ def load_model(checkpoint_path="blueberry_model.pt"):
         print("✅ Loaded tokenizer from checkpoint")
     else:
         print("⚠️  Tokenizer not found in checkpoint, creating new one...")
-        tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM-135M", token=False)
+        tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-2-7b", token=False)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         print("✅ Created tokenizer from HuggingFaceTB/SmolLM-135M")

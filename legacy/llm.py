@@ -150,7 +150,7 @@ def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
     print(f"🔄 Processing new data (will cache for future use)")
 
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM-135M", token=False)
+    tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-2-7b", token=False)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
