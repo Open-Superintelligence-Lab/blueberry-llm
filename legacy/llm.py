@@ -46,6 +46,7 @@ class MoEModelConfig:
     # Training parameters
     gradient_accumulation_steps: int = 4
     muon_lr: float = 0.01
+    adam_lr: float = 0.001
 
     # Data parameters
     max_seq_len: int = 512
@@ -595,7 +596,7 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
     muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=0.95)
-    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.muon_lr*0.1, weight_decay=config.weight_decay)
+    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.adam_lr, weight_decay=config.weight_decay)
 
     return [muon_optimizer, adamw_optimizer]
 
@@ -710,7 +711,9 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                     'loss': f'{current_loss:.4f}',
                     'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
-                    'ppl': f'{perplexity:.1f}'
+                    'ppl': f'{perplexity:.1f}',
+                    'muon_lr': f'{config.muon_lr:.2e}',
+                    'adam_lr': f'{config.adam_lr:.2e}'
                 })
 
             # Evaluation
