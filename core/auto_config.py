@@ -112,7 +112,8 @@ class BlueberryAutoConfigurator:
             batch_size=16,  
             gradient_accumulation_steps=4,  # 16 * 4 = 64
             max_steps=2000, 
-            learning_rate=0.01,
+            muon_lr=0.01,
+            adam_lr=0.001,
             max_seq_len=512,
             use_distributed=(num_gpus > 1),
             use_amp=True,
@@ -125,7 +126,9 @@ class BlueberryAutoConfigurator:
             num_gpus=0, gpu_memory_gb=0,
             d_model=128, n_layers=2, n_heads=4, num_experts=2,
             batch_size=4, gradient_accumulation_steps=8, max_steps=500,
-            learning_rate=0.001, max_seq_len=256,
+            muon_lr=0.01,
+            adam_lr=0.001,
+            max_seq_len=256,
             use_distributed=False, use_amp=False, use_megatron=False
         )
     
@@ -145,7 +148,7 @@ class BlueberryAutoConfigurator:
         print(f"📊 Batch: {self.config.batch_size} (accum: {self.config.gradient_accumulation_steps})")
         print(f"📝 Sequence: {self.config.max_seq_len}")
         print(f"⚡ Mixed Precision: {'Yes' if self.config.use_amp else 'No'}")
-        
+            
         if self.config.use_distributed:
             print(f"🌐 Data Parallel: Yes (across {self.config.num_gpus} GPUs)")
             print(f"   Run with: torchrun --nproc_per_node={self.config.num_gpus} train_auto.py")
