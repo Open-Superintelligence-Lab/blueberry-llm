@@ -32,7 +32,7 @@ def load_model(checkpoint_path="blueberry_model.pt"):
         print("✅ Loaded tokenizer from checkpoint")
     else:
         print("⚠️  Tokenizer not found in checkpoint, creating new one...")
-        tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM-135M", token=False)
+        tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-2-7b", token=False)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         print("✅ Created tokenizer from HuggingFaceTB/SmolLM-135M")
@@ -130,7 +130,7 @@ def interactive_mode(model, tokenizer, device, config):
 
 def main():
     parser = argparse.ArgumentParser(description="Inference for Blueberry LLM")
-    parser.add_argument("--prompt", type=str, help="Text prompt for generation")
+    parser.add_argument("--prompt", type=str, default="Once upon a time,",help="Text prompt for generation")
     parser.add_argument("--checkpoint", default="blueberry_model.pt", help="Model checkpoint path")
     parser.add_argument("--max-length", type=int, default=100, help="Maximum generation length")
     parser.add_argument("--temperature", type=float, default=0.8, help="Sampling temperature")

@@ -78,7 +78,7 @@ python core/train.py --d-model 768 --n-layers 12
 ### Inference
 ```bash
 # Generate text from trained model
-python inference.py "Your prompt here"
+python inference.py --prompt "Your prompt here"
 
 # Interactive mode
 python inference.py --interactive

@@ -129,6 +129,7 @@ def train_model_native(
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
+    model_train = torch.compile(model)
     
     # Print system and model information
     print(f"\n🚀 Training {model.__class__.__name__}")
@@ -141,7 +142,7 @@ def train_model_native(
     
     # Setup optimizers and schedulers
     optimizers = setup_optimizers(model, config, use_warmup=True)
-    schedulers = [get_lr_scheduler(opt, config, "cosine_warmup") for opt in optimizers]
+    schedulers = [get_lr_scheduler(opt, config, "deepseek_warmup") for opt in optimizers]
     
     # Setup gradient scaler for mixed precision
     scaler = GradScaler('cuda') if config.use_amp else None
@@ -301,10 +302,10 @@ def _training_step(
     if state.config.use_amp:
         with autocast('cuda'):
             # Handle models with auxiliary loss (MoE)
-            if hasattr(state.model, 'forward') and 'return_aux_loss' in state.model.forward.__code__.co_varnames:
-                logits, aux_loss = state.model(x, return_aux_loss=True)
+            if hasattr(state.model_train, 'forward') and 'return_aux_loss' in state.model_train.forward.__code__.co_varnames:
+                logits, aux_loss = state.model_train(x, return_aux_loss=True)
             else:
-                logits = state.model(x)
+                logits = state.model_train(x)
                 aux_loss = None
             
             # Compute main loss
@@ -337,10 +338,10 @@ def _training_step(
         state.scaler.scale(loss).backward()
     else:
         # Forward pass without AMP
-        if hasattr(state.model, 'forward') and 'return_aux_loss' in state.model.forward.__code__.co_varnames:
-            logits, aux_loss = state.model(x, return_aux_loss=True)
+        if hasattr(state.model_train, 'forward') and 'return_aux_loss' in state.model_train.forward.__code__.co_varnames:
+            logits, aux_loss = state.model_train(x, return_aux_loss=True)
         else:
-            logits = state.model(x)
+            logits = state.model_train(x)
             aux_loss = None
         
         ce_loss = F.cross_entropy(
@@ -389,7 +390,7 @@ def _optimizer_step(state: TrainingState):
         # Check for NaN/inf gradients before clipping
         total_norm = 0.0
         param_count = 0
-        for param in state.model.parameters():
+        for param in state.model_train.parameters():
             if param.grad is not None:
                 param_count += 1
                 param_norm = param.grad.data.norm(2)
@@ -407,7 +408,7 @@ def _optimizer_step(state: TrainingState):
             print(f"⚠️  WARNING: Very large gradient norm: {total_norm:.2f}")
         
         # Clip gradients
-        torch.nn.utils.clip_grad_norm_(state.model.parameters(), state.config.grad_clip)
+        torch.nn.utils.clip_grad_norm_(state.model_train.parameters(), state.config.grad_clip)
         
         # Optimizer step
         for optimizer in state.optimizers:
@@ -422,7 +423,7 @@ def _optimizer_step(state: TrainingState):
             scheduler.step()
     else:
         # Clip gradients
-        torch.nn.utils.clip_grad_norm_(state.model.parameters(), state.config.grad_clip)
+        torch.nn.utils.clip_grad_norm_(state.model_train.parameters(), state.config.grad_clip)
         
         # Optimizer step
         for optimizer in state.optimizers:
@@ -450,16 +451,13 @@ def _log_training_progress(
     # Compute additional metrics
     perplexity = math.exp(min(loss_dict['ce_loss'], 20))
     
-    # Current learning rates
-    current_lrs = [group['lr'] for opt in state.optimizers for group in opt.param_groups]
-    avg_lr = sum(current_lrs) / len(current_lrs) if current_lrs else 0.0
-    
     # Update progress bar
     pbar.set_postfix({
         'loss': f"{loss_dict['ce_loss']:.4f}",
         'aux': f"{loss_dict['aux_loss']:.4f}",
         'ppl': f"{perplexity:.1f}",
-        'lr': f"{avg_lr:.2e}"
+        'adam_lr': f"{state.config.adam_lr:.2e}",
+        'muon_lr': f"{state.config.muon_lr:.2e}"
     })
 
 
@@ -483,7 +481,7 @@ def _evaluate_and_log(
     elapsed_time = time.time() - state.training_start_time
     
     # Evaluate model
-    eval_metrics = evaluate_model(state.model, val_loader, state.config)
+    eval_metrics = evaluate_model(state.model_train, val_loader, state.config)
     
     # Add timing info
     eval_metrics.update({
@@ -503,8 +501,8 @@ def _evaluate_and_log(
         print(f"   Training Time: {elapsed_time/60:.1f} minutes")
         
         # Compute additional final metrics
-        if hasattr(state.model, 'estimate_mfu'):
-            mfu = state.model.estimate_mfu(
+        if hasattr(state.model_train, 'estimate_mfu'):
+            mfu = state.model_train.estimate_mfu(
                 fwdbwd_per_iter=1,
                 dt=elapsed_time / state.step if state.step > 0 else 1.0
             )

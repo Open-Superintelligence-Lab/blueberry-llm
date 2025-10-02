@@ -5,7 +5,7 @@ This module contains the configuration dataclass for the GPU-adaptive
 MoE model with automatic optimization based on hardware capabilities.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Tuple
 from system import SYSTEM_CONFIG
 
@@ -22,19 +22,22 @@ class AdaptiveMoEModelConfig:
     # Model architecture
     d_model: int = 384
     n_heads: int = 8
-    n_layers: int = 6
-    d_ff: int = 1536
-    batch_size: int = 24
-    max_steps: int = 1000
+    n_kv_heads: int = field(init=False)
+    n_layers: int = 8
+    d_ff: int = field(init=False)
+    multiple_of: int = 128
+    batch_size: int = 12
+    max_steps: int = 2000
 
     # Training parameters
     gradient_accumulation_steps: int = 4
     muon_lr: float = 0.01
+    adam_lr: float = 0.001
 
     # Data parameters
     max_seq_len: int = 512
-    num_documents: int = 2000
-    max_tokens: int = 500000
+    max_tokens: int = -1
+    dataset_name: str = "Hosseinlack123/PicoLM-dataset"
 
     # Evaluation
     eval_every: int = 500
@@ -42,7 +45,7 @@ class AdaptiveMoEModelConfig:
 
     # Regularization
     weight_decay: float = 0.1
-    dropout: float = 0.1
+    dropout: float = 0.0
     grad_clip: float = 1.0
 
     # Technical
@@ -66,8 +69,13 @@ class AdaptiveMoEModelConfig:
 
     def __post_init__(self):
         """Post-initialization to validate and adapt configuration based on hardware."""
-        self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+        self.d_k = self.d_model // self.n_heads
+        
+        assert self.n_heads % 4 == 0, "n_heads must be divisible by 4"
+        self.n_kv_heads = self.n_heads // 4
+        
+        self.d_ff = int(self.multiple_of * int((((self.d_model * 4 * 2 / 3) * 1.3) + self.multiple_of + 1) // self.multiple_of))
         
         # Auto-detect optimal settings based on GPU
         if SYSTEM_CONFIG.has_fp8_support and self.use_fp8:
@@ -147,13 +155,14 @@ def get_rtx4090_config() -> AdaptiveMoEModelConfig:
         d_ff=3072,    # Increased from 1536
         batch_size=24,  # Increased from 16
         max_steps=2000,  # Increased from 1000
-        max_seq_len=2048,  # Increased from 1024
+        max_seq_len=1024,
         num_experts=16,  # Increased from 8
         expert_top_k=2,
         gradient_accumulation_steps=2,  # Reduced for larger batch
         use_fp8=False,  # RTX 4090 doesn't support FP8
         use_adaptive_matmul=True,
         muon_lr=0.01,
+        adam_lr=0.001,
         eval_every=250,
         eval_steps=50,
     )
@@ -173,6 +182,8 @@ def get_rtx5090_config() -> AdaptiveMoEModelConfig:
         expert_top_k=2,
         use_fp8=True,  # Enable FP8 for Blackwell
         use_adaptive_matmul=True,
+        muon_lr=0.01,
+        adam_lr=0.001,
     )
 
 
@@ -185,9 +196,11 @@ def get_development_config() -> AdaptiveMoEModelConfig:
         d_ff=1024,   # 1024 is divisible by 16
         batch_size=16,
         max_steps=500,
-        max_seq_len=256,
+        max_seq_len=512,
         num_experts=8,  # Changed from 4 to 8 (8 is divisible by 16)
         expert_top_k=2,
         eval_every=100,
         eval_steps=50,
+        muon_lr=0.01,
+        adam_lr=0.001,
     )

@@ -2,7 +2,7 @@
 T4 Speedrun Configuration
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from configs import AdaptiveMoEModelConfig
 
 
@@ -20,8 +20,8 @@ class T4SpeedrunConfig(AdaptiveMoEModelConfig):
     # Default configuration
     d_model: int = 256
     n_heads: int = 8
-    n_layers: int = 6
-    d_ff: int = 1024
+    n_layers: int = 8
+    d_ff: int = field(init=False)
     batch_size: int = 16
     max_steps: int = 2000
     max_seq_len: int = 512
@@ -31,6 +31,7 @@ class T4SpeedrunConfig(AdaptiveMoEModelConfig):
     # Training parameters
     gradient_accumulation_steps: int = 4
     muon_lr: float = 0.01
+    adam_lr: float = 0.001
     eval_every: int = 200
     eval_steps: int = 50
     
@@ -51,6 +52,7 @@ class T4SpeedrunConfig(AdaptiveMoEModelConfig):
         assert self.num_documents == self.SPEEDRUN_MAX_DOCUMENTS
         assert self.max_tokens == self.SPEEDRUN_MAX_TOKENS
         self.use_fp8 = False  # T4 doesn't support FP8
+        self.d_ff = int(self.multiple_of * int((((self.d_model * 4 * 2 / 3) * 1.3) + self.multiple_of + 1) // self.multiple_of))
 
 
 def get_t4_speedrun_config() -> T4SpeedrunConfig:

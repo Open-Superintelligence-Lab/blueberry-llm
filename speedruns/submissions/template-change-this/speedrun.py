@@ -119,17 +119,19 @@ def main():
     parser.add_argument("--d-model", type=int, help="Model dimension")
     parser.add_argument("--n-layers", type=int, help="Number of layers")
     parser.add_argument("--batch-size", type=int, help="Batch size")
-    parser.add_argument("--lr", type=float, help="Learning rate")
+    parser.add_argument("--muon-lr", type=float, help="Muon learning rate")
+    parser.add_argument("--adam-lr", type=float, help="Adam learning rate")
     
     args = parser.parse_args()
     
     # Get configuration
-    if args.d_model or args.n_layers or args.batch_size or args.lr:
+    if args.d_model or args.n_layers or args.batch_size or args.muon_lr or args.adam_lr:
         config_kwargs = {}
         if args.d_model: config_kwargs['d_model'] = args.d_model
         if args.n_layers: config_kwargs['n_layers'] = args.n_layers
         if args.batch_size: config_kwargs['batch_size'] = args.batch_size
-        if args.lr: config_kwargs['muon_lr'] = args.lr
+        if args.muon_lr: config_kwargs['muon_lr'] = args.muon_lr
+        if args.adam_lr: config_kwargs['adam_lr'] = args.adam_lr
         config = create_custom_t4_config(**config_kwargs)
     else:
         config = get_t4_speedrun_config()

@@ -13,7 +13,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 import time
 from transformers import AutoTokenizer
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 import warnings
 import os
@@ -36,19 +36,22 @@ class MoEModelConfig:
     # Model architecture
     d_model: int = 384
     n_heads: int = 8
-    n_layers: int = 6
-    d_ff: int = 1536
-    batch_size: int = 24
-    max_steps: int = 1000
+    n_kv_heads: int = field(init=False)
+    n_layers: int = 8
+    d_ff: int = field(init=False)
+    multiple_of: int = 128
+    batch_size: int = 16
+    max_steps: int = 2000
 
     # Training parameters
     gradient_accumulation_steps: int = 4
     muon_lr: float = 0.01
+    adam_lr: float = 0.001
 
     # Data parameters
     max_seq_len: int = 512
-    num_documents: int = 2000
-    max_tokens: int = 500000
+    max_tokens: int = -1 # set to -1 to include all tokens
+    dataset_name: str = "Hosseinlack123/PicoLM-dataset"
 
     # Evaluation
     eval_every: int = 500
@@ -56,7 +59,7 @@ class MoEModelConfig:
 
     # Regularization
     weight_decay: float = 0.1
-    dropout: float = 0.1
+    dropout: float = 0.0
     grad_clip: float = 1.0
 
     # Technical
@@ -65,13 +68,19 @@ class MoEModelConfig:
     log_milestones: Tuple[int, ...] = (250, 500, 1000)
 
     # MoE specific parameters
-    num_experts: int = 8
+    num_experts: int = 6
     expert_top_k: int = 2
     load_balancing_weight: float = 0.01
 
     def __post_init__(self):
-        self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+        self.d_k = self.d_model // self.n_heads
+        
+        assert self.n_heads % 4 == 0, "n_heads must be divisible by 4"
+        self.n_kv_heads = self.n_heads // 4
+        
+        self.d_ff = int(self.multiple_of * int((((self.d_model * 4 * 2 / 3) * 1.3) + self.multiple_of + 1) // self.multiple_of))
+        
 
 @torch.compile
 def zeropower_via_newtonschulz5(G: torch.Tensor, steps: int = 5) -> torch.Tensor:
@@ -123,7 +132,7 @@ class Muon(torch.optim.Optimizer):
 def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
     """Load and cache tokenized data to avoid reprocessing"""
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f"{cache_dir}/tokenized_data_{config.num_documents}_{config.max_tokens}.pkl"
+    cache_file = f"{cache_dir}/tokenized_{config.dataset_name.split('/')[-1]}_{config.max_tokens}.pkl"
 
     # Check if cached data exists
     if os.path.exists(cache_file):
@@ -142,29 +151,34 @@ def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
     print(f"🔄 Processing new data (will cache for future use)")
 
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM-135M", token=False)
+    tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-2-7b", token=False)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     # Load dataset
-    dataset = load_dataset("HuggingFaceTB/smollm-corpus", "cosmopedia-v2", split="train", streaming=True, token=False)
-
+    dataset = load_dataset(config.dataset_name, token=False)['train']
+    
     texts = []
     for i, item in enumerate(dataset):
-        if i >= config.num_documents:
-            break
-        texts.append(item["text"][:3000])
-
-    print(f"Loaded {len(texts)} documents")
+        texts.append(item["text"])
+        
+    print(f"Loaded {len(texts)} Docs")
 
     # Tokenize
     print("Tokenizing texts...")
+    
+    max_tokens = config.max_tokens
+    
     all_tokens = []
     for text in tqdm(texts, desc="Tokenizing"):
-        tokens = tokenizer.encode(text, add_special_tokens=False)
+        tokens = tokenizer.encode(text + tokenizer.eos_token, add_special_tokens=False)
         all_tokens.extend(tokens)
+        
+        # Stop if we have enough tokens
+        if max_tokens != -1 and len(all_tokens) >= max_tokens:
+            break
 
-    tokens = all_tokens[:config.max_tokens]
+    tokens = all_tokens[:max_tokens]
     print(f"Using {len(tokens):,} tokens")
     config.vocab_size = tokenizer.vocab_size
 
@@ -201,14 +215,24 @@ class Rotary(nn.Module):
         return self.rope(x_BTHD)
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, n_heads: int, n_kv_heads: int, max_seq_len: int, dropout: float = 0.0):
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
+        self.n_kv_heads = n_kv_heads
         self.d_k = d_model // n_heads
+        self.repeats = self.n_heads // self.n_kv_heads
+        
+        total_qkv_dim = (self.n_heads + (2 * self.n_kv_heads)) * self.d_k
+        
 
-        self.qkv = nn.Linear(d_model, d_model * 3, bias=False)
+        self.qkv = nn.Linear(d_model, total_qkv_dim, bias=True)
         self.w_o = nn.Linear(d_model, d_model, bias=False)
+        self.w_o.ZERO_INIT = 1
+        
+        self.q_norm = nn.RMSNorm(self.d_k, eps=1e-6)
+        self.k_norm = nn.RMSNorm(self.d_k, eps=1e-6)
+        
         self.rotary = Rotary(self.d_k, max_seq_len)
         self.dropout = dropout
 
@@ -218,15 +242,25 @@ class MultiHeadAttention(nn.Module):
         # qkv = self.qkv(x).reshape(B, T, 3, self.n_heads, self.d_k).permute(2, 0, 3, 1, 4)
         # Q, K, V = qkv[0], qkv[1], qkv[2]  # [B, H, T, D]
 
-        qkv = self.qkv(x).reshape(batch_size, seq_len, 3, self.n_heads, self.d_k)
-        qkv = qkv.permute(2, 0, 3, 1, 4)
-        Q, K, V = qkv[0], qkv[1], qkv[2] # [B, H, T, D]
+        qkv = self.qkv(x)
+        q_size = self.n_heads * self.d_k
+        kv_size = self.n_kv_heads * self.d_k
+        
+        Q, K, V = torch.split(qkv, [q_size, kv_size, kv_size], dim=-1)
+    
+        Q = Q.view(batch_size, seq_len, self.n_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_heads, seq_len, d_k]
+        K = K.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+        V = V.view(batch_size, seq_len, self.n_kv_heads, self.d_k).permute(0, 2, 1, 3) # [ batch_size, n_kv_heads, seq_len, d_k]
+
 
         # Q = self.rotary(Q)
         # K = self.rotary(K)
         # Apply RoPE on [B, T, H, D]
-        Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
-        K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
+        Q = self.rotary(self.q_norm(Q).transpose(1, 2)).transpose(1, 2)
+        K = self.rotary(self.k_norm(K).transpose(1, 2)).transpose(1, 2)
+        
+        K = K.repeat_interleave(self.repeats, dim=1)
+        V = V.repeat_interleave(self.repeats, dim=1)
 
         attn_output = F.scaled_dot_product_attention(
             Q, K, V, is_causal=True, dropout_p=self.dropout if self.training else 0.0
@@ -239,13 +273,22 @@ class MultiHeadAttention(nn.Module):
 
 class Expert(nn.Module):
     """Single expert network (essentially a FeedForward layer)"""
-    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.0):
         super().__init__()
+        
+        # self.w1 = nn.Linear(d_model, d_ff, bias=False) # up_proj
+        # self.w2 = nn.Linear(d_ff, d_model, bias=False) # down_proj
+        # self.w3 = nn.Linear(d_model, d_ff, bias=False) # gate_proj
+        # self.w3.ZERO_INIT = 1
+        
         self.linear1 = nn.Linear(d_model, d_ff, bias=False)
         self.linear2 = nn.Linear(d_ff, d_model, bias=False)
+        # self.linear2.ZERO_INIT = 1
+                
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        # return self.w2(self.dropout(F.silu(self.w1(x))) * self.w3(x))
         return self.linear2(self.dropout(F.silu(self.linear1(x))))
 
 class TopKRouter(nn.Module):
@@ -294,7 +337,7 @@ class MixtureOfExperts(nn.Module):
         d_ff: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1,
+        dropout: float = 0.0,
         load_balancing_weight: float = 0.01
     ):
         super().__init__()
@@ -386,16 +429,17 @@ class MoETransformerBlock(nn.Module):
         self,
         d_model: int,
         n_heads: int,
+        n_kv_heads: int,
         d_ff: int,
         max_seq_len: int,
         num_experts: int = 8,
         top_k: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.0
     ):
         super().__init__()
 
         # Attention layer
-        self.attention = MultiHeadAttention(d_model, n_heads, max_seq_len, dropout)
+        self.attention = MultiHeadAttention(d_model, n_heads, n_kv_heads, max_seq_len, dropout)
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(
@@ -404,17 +448,21 @@ class MoETransformerBlock(nn.Module):
 
         # Normalization layers
         self.norm1 = nn.RMSNorm(d_model)
+        self.post_norm1 = nn.RMSNorm(d_model)
+        
         self.norm2 = nn.RMSNorm(d_model)
+        self.post_norm2 = nn.RMSNorm(d_model)
+        
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         # Self-attention
-        attn_out = self.attention(self.norm1(x))
+        attn_out = self.post_norm1(self.attention(self.norm1(x)))
         x = x + self.dropout(attn_out)
 
         # MoE feed-forward
         ff_out, aux_loss = self.feed_forward(self.norm2(x))
-        x = x + self.dropout(ff_out)
+        x = x + self.dropout(self.post_norm2(ff_out))
         return x, aux_loss
 
 
@@ -433,6 +481,7 @@ class MoEMinimalLLM(nn.Module):
             MoETransformerBlock(
                 config.d_model,
                 config.n_heads,
+                config.n_kv_heads,
                 config.d_ff,
                 config.max_seq_len,
                 config.num_experts,
@@ -452,8 +501,18 @@ class MoEMinimalLLM(nn.Module):
 
         self.apply(self._init_weights)
 
+        # Depth-aware init "https://medium.com/@hosseinlack123/unlocking-transformer-learning-weight-dispersion-and-a-novel-depth-aware-initialization-strategy-6e43dddb10a4"
+        for i, block in enumerate(self.transformer_blocks):
+            std = 0.04 - (i / (config.n_layers - 1)) * 0.04 if config.n_layers > 1 else 0.02
+            for i, expert in enumerate(block.feed_forward.experts):
+              torch.nn.init.normal_(expert.linear2.weight, mean=0.0, std=std)
+
     def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
+        
+        if hasattr(module, 'ZERO_INIT'):
+            if isinstance(module, nn.Linear):
+                torch.nn.init.zeros_(module.weight)  
+        elif isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
@@ -537,7 +596,7 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
     muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=0.95)
-    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.muon_lr*0.1, weight_decay=config.weight_decay)
+    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.adam_lr, weight_decay=config.weight_decay)
 
     return [muon_optimizer, adamw_optimizer]
 
@@ -547,10 +606,11 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     print(f"\n🚀 Training MoE model with {config.num_experts} experts (top-{config.expert_top_k})")
 
     # Initialize model
-    set_seed(42)
+    set_seed(1337)
     model = MoEMinimalLLM(config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
+    model_train = torch.compile(model)
 
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
@@ -583,7 +643,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     scaler = GradScaler() if config.use_amp else None
 
     # Training loop
-    model.train()
+    model_train.train()
     step = 0
     pbar = tqdm(total=config.max_steps, desc="Training MoE")
 
@@ -597,7 +657,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
             # Forward pass
             if config.use_amp:
                 with autocast():
-                    logits, aux_loss = model(x, return_aux_loss=True)
+                    logits, aux_loss = model_train(x, return_aux_loss=True)
                     ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
 
                     # Combine main loss and auxiliary loss
@@ -608,7 +668,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                     loss = total_loss / config.gradient_accumulation_steps
                 scaler.scale(loss).backward()
             else:
-                logits, aux_loss = model(x, return_aux_loss=True)
+                logits, aux_loss = model_train(x, return_aux_loss=True)
                 ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
 
                 total_loss = ce_loss
@@ -623,7 +683,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                 if config.use_amp:
                     for optimizer in optimizers:
                         scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                    torch.nn.utils.clip_grad_norm_(model_train.parameters(), config.grad_clip)
 
                     for optimizer in optimizers:
                         scaler.step(optimizer)
@@ -632,7 +692,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                         scheduler.step()
                     scaler.update()
                 else:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                    torch.nn.utils.clip_grad_norm_(model_train.parameters(), config.grad_clip)
                     for optimizer in optimizers:
                         optimizer.step()
                         optimizer.zero_grad()
@@ -651,19 +711,21 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                     'loss': f'{current_loss:.4f}',
                     'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
-                    'ppl': f'{perplexity:.1f}'
+                    'ppl': f'{perplexity:.1f}',
+                    'muon_lr': f'{config.muon_lr:.2e}',
+                    'adam_lr': f'{config.adam_lr:.2e}'
                 })
 
             # Evaluation
             if step % config.eval_every == 0 and step > 0:
-                eval_metrics = evaluate_model(model, val_loader, config)
+                eval_metrics = evaluate_model(model_train, val_loader, config)
                 print(f"\nStep {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
                       f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
                       f"Val PPL: {eval_metrics['val_perplexity']:.2f}")
 
             # Milestone evaluations
             if step in getattr(config, 'log_milestones', ()):    
-                eval_metrics = evaluate_model(model, val_loader, config)
+                eval_metrics = evaluate_model(model_train, val_loader, config)
                 print(f"\n🧪 Milestone {step}: Val Loss: {eval_metrics['val_loss']:.4f}")
 
             step += 1
@@ -673,7 +735,7 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     pbar.close()
 
     # Final evaluation
-    final_eval = evaluate_model(model, val_loader, config)
+    final_eval = evaluate_model(model_train, val_loader, config)
     print(f"\n📊 Final Results:")
     print(f"   Val Loss: {final_eval['val_loss']:.4f}")
     print(f"   Val Accuracy: {final_eval['val_accuracy']:.4f}")
