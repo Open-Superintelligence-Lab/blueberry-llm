@@ -31,6 +31,7 @@ class T4SpeedrunConfig(AdaptiveMoEModelConfig):
     # Training parameters
     gradient_accumulation_steps: int = 4
     muon_lr: float = 0.01
+    adam_lr: float = 0.001
     eval_every: int = 200
     eval_steps: int = 50
     

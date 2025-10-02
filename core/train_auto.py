@@ -195,6 +195,7 @@ def main():
             max_steps=model_config.max_steps,
             gradient_accumulation_steps=model_config.gradient_accumulation_steps,
             muon_lr=model_config.muon_lr,
+            adam_lr=model_config.adam_lr,
             max_seq_len=model_config.max_seq_len,
             num_experts=model_config.num_experts,
             use_amp=model_config.use_amp,

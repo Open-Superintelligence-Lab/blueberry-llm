@@ -450,16 +450,13 @@ def _log_training_progress(
     # Compute additional metrics
     perplexity = math.exp(min(loss_dict['ce_loss'], 20))
     
-    # Current learning rates
-    current_lrs = [group['lr'] for opt in state.optimizers for group in opt.param_groups]
-    avg_lr = sum(current_lrs) / len(current_lrs) if current_lrs else 0.0
-    
     # Update progress bar
     pbar.set_postfix({
         'loss': f"{loss_dict['ce_loss']:.4f}",
         'aux': f"{loss_dict['aux_loss']:.4f}",
         'ppl': f"{perplexity:.1f}",
-        'lr': f"{avg_lr:.2e}"
+        'adam_lr': f"{state.config.adam_lr:.2e}",
+        'muon_lr': f"{state.config.muon_lr:.2e}"
     })
 
 

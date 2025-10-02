@@ -32,6 +32,7 @@ class AdaptiveMoEModelConfig:
     # Training parameters
     gradient_accumulation_steps: int = 4
     muon_lr: float = 0.01
+    adam_lr: float = 0.001
 
     # Data parameters
     max_seq_len: int = 512
@@ -161,6 +162,7 @@ def get_rtx4090_config() -> AdaptiveMoEModelConfig:
         use_fp8=False,  # RTX 4090 doesn't support FP8
         use_adaptive_matmul=True,
         muon_lr=0.01,
+        adam_lr=0.001,
         eval_every=250,
         eval_steps=50,
     )
@@ -180,6 +182,8 @@ def get_rtx5090_config() -> AdaptiveMoEModelConfig:
         expert_top_k=2,
         use_fp8=True,  # Enable FP8 for Blackwell
         use_adaptive_matmul=True,
+        muon_lr=0.01,
+        adam_lr=0.001,
     )
 
 
@@ -197,4 +201,6 @@ def get_development_config() -> AdaptiveMoEModelConfig:
         expert_top_k=2,
         eval_every=100,
         eval_steps=50,
+        muon_lr=0.01,
+        adam_lr=0.001,
     )

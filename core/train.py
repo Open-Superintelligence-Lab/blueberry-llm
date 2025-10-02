@@ -59,7 +59,8 @@ def parse_arguments():
     # Training options
     parser.add_argument("--max-steps", type=int, help="Maximum training steps")
     parser.add_argument("--batch-size", type=int, help="Batch size")
-    parser.add_argument("--lr", type=float, help="Learning rate")
+    parser.add_argument("--muon-lr", type=float, help="Muon learning rate")
+    parser.add_argument("--adam-lr", type=float, help="Adam learning rate")
     parser.add_argument("--no-fp8", action="store_true", help="Disable FP8 acceleration")
     parser.add_argument("--no-amp", action="store_true", help="Disable automatic mixed precision")
     
@@ -103,8 +104,10 @@ def get_config(args):
         config.max_steps = args.max_steps
     if args.batch_size is not None:
         config.batch_size = args.batch_size
-    if args.lr is not None:
-        config.muon_lr = args.lr
+    if args.muon_lr is not None:
+        config.muon_lr = args.muon_lr
+    if args.adam_lr is not None:
+        config.adam_lr = args.adam_lr
     if args.max_tokens is not None:
         config.max_tokens = args.max_tokens
     if args.max_seq_len is not None:

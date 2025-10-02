@@ -91,7 +91,7 @@ def setup_optimizers(
     if adamw_params:
         adamw_optimizer = torch.optim.AdamW(
             adamw_params, 
-            lr=config.muon_lr * 0.1,  # Lower learning rate for AdamW
+            lr=config.adam_lr,  # Lower learning rate for AdamW
             weight_decay=config.weight_decay,
             betas=(0.9, 0.999),
             eps=1e-8
@@ -129,13 +129,13 @@ def setup_parameter_groups(
         {
             "name": "embeddings",
             "params": [],
-            "lr": config.muon_lr * 0.1,
+            "lr": config.adam_lr,
             "weight_decay": config.weight_decay,
         },
         {
             "name": "norms_and_biases",
             "params": [],
-            "lr": config.muon_lr * 0.1,
+            "lr": config.adam_lr,
             "weight_decay": 0.0,  # Don't decay biases and norms
         }
     ]

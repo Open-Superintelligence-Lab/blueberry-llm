@@ -35,7 +35,8 @@ class AutoConfig:
     batch_size: int
     gradient_accumulation_steps: int
     max_steps: int
-    learning_rate: float
+    muon_lr: float
+    adam_lr: float
     max_seq_len: int
     
     # Performance
@@ -162,7 +163,8 @@ class BlueberryAutoConfigurator:
             batch_size=self.config.batch_size,
             max_steps=self.config.max_steps,
             gradient_accumulation_steps=self.config.gradient_accumulation_steps,
-            muon_lr=self.config.learning_rate,
+            muon_lr=self.config.muon_lr,
+            adam_lr=self.config.adam_lr,
             max_seq_len=self.config.max_seq_len,
             num_experts=self.config.num_experts,
             use_amp=self.config.use_amp,
