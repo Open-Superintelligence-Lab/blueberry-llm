@@ -6,21 +6,21 @@ from typing import Optional, Tuple
 class MoE18BConfig:
     """Configuration for 18B parameter MoE model optimized for B200 192GB"""
     
-    # Model architecture - ~10B total params to fit in B200 memory
-    d_model: int = 2560          # Hidden dimension
-    n_heads: int = 20            # Attention heads
-    n_layers: int = 28           # Transformer layers
-    d_ff: int = 6912             # FFN dimension per expert
+    # Model architecture - ~8B params optimized for B200 (target ~80GB usage)
+    d_model: int = 2816          # Hidden dimension
+    n_heads: int = 22            # Attention heads (d_model / n_heads = 128)
+    n_layers: int = 30           # Transformer layers
+    d_ff: int = 7680             # FFN dimension per expert
     
     # MoE specific parameters
-    num_experts: int = 4         # Total experts (reduced from 8)
+    num_experts: int = 8         # Total experts
     expert_top_k: int = 2        # Active experts per token
     load_balancing_weight: float = 0.01
     
     # Training parameters
-    batch_size: int = 2          # Tokens per batch (reduced from 4)
-    max_seq_len: int = 2048      # Context window (reduced from 4096)
-    gradient_accumulation_steps: int = 8  # Effective batch size = 16
+    batch_size: int = 3          # Tokens per batch (balanced)
+    max_seq_len: int = 2048      # Context window
+    gradient_accumulation_steps: int = 8  # Effective batch size = 24
     max_steps: int = 50000       # Training steps
     
     # Optimizer settings

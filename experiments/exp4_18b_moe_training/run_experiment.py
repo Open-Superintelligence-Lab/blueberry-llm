@@ -91,9 +91,9 @@ def main():
     
     # Override training steps for test mode
     if args.test:
-        config.max_steps = 20
-        config.eval_every = 10
-        config.save_every = 20
+        config.max_steps = 100
+        config.eval_every = 20
+        config.save_every = 10000  # Don't save during test to avoid disk errors
         print(f"   🧪 Test mode: Training for only {config.max_steps} steps")
     
     # Create dataset
@@ -153,6 +153,51 @@ def main():
     print(f"   Validation Perplexity: {final_metrics['val_perplexity']:.2f}")
     print(f"\nCheckpoints saved in: {checkpoint_dir}")
     print(f"Results saved in: {checkpoint_dir}/training_results.json")
+    
+    # Run inference demo in test mode
+    if args.test:
+        print(f"\n{'='*70}")
+        print(f"🎨 Running Inference Demo")
+        print(f"{'='*70}\n")
+        
+        # Generate some sample text
+        prompts = [
+            "Once upon a time",
+            "The future of artificial intelligence is",
+            "In a world where"
+        ]
+        
+        model.eval()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        for prompt in prompts:
+            input_ids = tokenizer.encode(prompt, return_tensors='pt').to(device)
+            print(f"\n📝 Prompt: '{prompt}'")
+            print(f"Generated: ", end='', flush=True)
+            
+            with torch.no_grad():
+                for _ in range(30):  # Generate 30 tokens
+                    logits, _ = model(input_ids, return_aux_loss=False)
+                    next_token_logits = logits[0, -1, :] / 0.8
+                    
+                    # Top-k sampling
+                    top_k = 50
+                    indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
+                    next_token_logits[indices_to_remove] = float('-inf')
+                    
+                    probs = torch.softmax(next_token_logits, dim=-1)
+                    next_token = torch.multinomial(probs, num_samples=1)
+                    
+                    input_ids = torch.cat([input_ids, next_token.unsqueeze(0)], dim=-1)
+                    next_word = tokenizer.decode(next_token.item())
+                    print(next_word, end='', flush=True)
+                    
+                    if next_token.item() == tokenizer.eos_token_id:
+                        break
+            
+            print()  # New line after generation
+        
+        print(f"\n{'='*70}")
 
 
 if __name__ == "__main__":
