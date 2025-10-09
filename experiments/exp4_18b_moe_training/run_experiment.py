@@ -26,6 +26,8 @@ def main():
                       help='GPU configuration to use (b200 or 4090)')
     parser.add_argument('--resume', type=str, default=None,
                       help='Path to checkpoint to resume from (e.g., checkpoints/checkpoint_latest.pt)')
+    parser.add_argument('--test', action='store_true',
+                      help='Run in test mode with minimal data and 20 steps')
     args = parser.parse_args()
     
     # Select config based on GPU type
@@ -71,6 +73,13 @@ def main():
     # Load data to get vocab_size
     print(f"\n📚 Loading data...")
     temp_config = ConfigClass()
+    
+    # Override for test mode - minimal data, streaming approach
+    if args.test:
+        print(f"🧪 TEST MODE: Using minimal data for quick test")
+        temp_config.num_documents = 100  # Just 100 documents
+        temp_config.max_tokens = 500_000  # 500K tokens instead of 100M
+    
     texts, tokenizer, tokens = load_and_cache_data(temp_config)
     vocab_size = temp_config.vocab_size
     
@@ -79,6 +88,13 @@ def main():
 
     # Create config with vocab_size
     config = ConfigClass(vocab_size=vocab_size)
+    
+    # Override training steps for test mode
+    if args.test:
+        config.max_steps = 20
+        config.eval_every = 10
+        config.save_every = 20
+        print(f"   🧪 Test mode: Training for only {config.max_steps} steps")
     
     # Create dataset
     dataset = TextTokenDataset(tokens, config.max_seq_len)

@@ -59,7 +59,7 @@ def evaluate_model(model, val_loader, config, device, max_steps=None):
             x, y = x.to(device), y.to(device)
             
             if config.use_amp:
-                with autocast('cuda', dtype=torch.float16):
+                with autocast('cuda', dtype=torch.bfloat16):
                     logits, _ = model(x, return_aux_loss=False)
                     loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
             else:
@@ -262,7 +262,7 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints', ch
 
             # Forward pass
             if config.use_amp:
-                with autocast('cuda', dtype=torch.float16):
+                with autocast('cuda', dtype=torch.bfloat16):
                     logits, aux_loss = model(x, return_aux_loss=True)
                     ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
 

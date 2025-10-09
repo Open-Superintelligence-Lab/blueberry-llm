@@ -6,21 +6,21 @@ from typing import Optional, Tuple
 class MoE18BConfig:
     """Configuration for 18B parameter MoE model optimized for B200 192GB"""
     
-    # Model architecture - ~18B total params, ~4.5B active per token
-    d_model: int = 4096          # Hidden dimension
-    n_heads: int = 32            # Attention heads  
-    n_layers: int = 40           # Transformer layers
-    d_ff: int = 11008           # FFN dimension (per expert)
+    # Model architecture - ~10B total params to fit in B200 memory
+    d_model: int = 2560          # Hidden dimension
+    n_heads: int = 20            # Attention heads
+    n_layers: int = 28           # Transformer layers
+    d_ff: int = 6912             # FFN dimension per expert
     
     # MoE specific parameters
-    num_experts: int = 8         # Total experts
+    num_experts: int = 4         # Total experts (reduced from 8)
     expert_top_k: int = 2        # Active experts per token
     load_balancing_weight: float = 0.01
     
     # Training parameters
-    batch_size: int = 4          # Tokens per batch
-    max_seq_len: int = 4096      # Context window
-    gradient_accumulation_steps: int = 8  # Effective batch size = 32
+    batch_size: int = 2          # Tokens per batch (reduced from 4)
+    max_seq_len: int = 2048      # Context window (reduced from 4096)
+    gradient_accumulation_steps: int = 8  # Effective batch size = 16
     max_steps: int = 50000       # Training steps
     
     # Optimizer settings
@@ -144,7 +144,7 @@ class MoE18BConfig:
         print(f"   Effective Batch Size: {self.batch_size * self.gradient_accumulation_steps}")
         print(f"   Total Steps: {self.max_steps:,}")
         print(f"   Learning Rate: {self.muon_lr}")
-        print(f"   Mixed Precision: {'✅ FP16' if self.use_amp else '❌ FP32'}")
+        print(f"   Mixed Precision: {'✅ BF16' if self.use_amp else '❌ FP32'}")
         
         print(f"\n📚 Data:")
         print(f"   Documents: {self.num_documents:,}")

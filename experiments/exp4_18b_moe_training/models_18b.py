@@ -302,5 +302,5 @@ class MoE18BLLM(nn.Module):
 
         if return_aux_loss:
             return logits, total_aux_loss
-        return logits
+        return logits, None
 
