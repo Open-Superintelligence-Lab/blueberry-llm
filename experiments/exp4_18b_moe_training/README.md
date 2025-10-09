@@ -1,3 +1,5 @@
+this is mid, probably delete it
+
 # Experiment 4: 18B Parameter MoE Training
 
 ## Overview
