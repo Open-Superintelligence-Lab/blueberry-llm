@@ -1,0 +1,29 @@
+<<<<<<< HEAD
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+results/*.json
+!results/.gitkeep
+
+=======
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+results/*.json
+!results/.gitkeep
+
+>>>>>>> e8f2fc47e63993a97bc8e16b3b827a7c313d98bf
