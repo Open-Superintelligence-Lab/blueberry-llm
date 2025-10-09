@@ -175,6 +175,8 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
     model.train()
     step = 0
     start_time = time.time()
+    total_tokens_processed = 0
+    tokens_per_step = config.batch_size * config.max_seq_len
     
     # Metrics tracking
     train_losses = []
@@ -256,11 +258,20 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
                     else:
                         mem_gb = 0
 
+                # Format tokens processed
+                if total_tokens_processed >= 1e9:
+                    tokens_str = f'{total_tokens_processed/1e9:.2f}B'
+                elif total_tokens_processed >= 1e6:
+                    tokens_str = f'{total_tokens_processed/1e6:.1f}M'
+                else:
+                    tokens_str = f'{total_tokens_processed/1e3:.1f}K'
+
                 pbar.set_postfix({
                     'loss': f'{current_loss:.4f}',
                     'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
                     'ppl': f'{perplexity:.1f}',
+                    'tokens': tokens_str,
                     'mem': f'{mem_gb:.1f}GB'
                 })
 
@@ -275,9 +286,9 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
                 eval_perplexities.append(eval_metrics['val_perplexity'])
                 
                 elapsed = time.time() - start_time
-                tokens_per_sec = (step * config.batch_size * config.max_seq_len) / elapsed
+                tokens_per_sec = total_tokens_processed / elapsed
                 
-                print(f"Step {step}/{config.max_steps}:")
+                print(f"Step {step}/{config.max_steps} | Tokens: {total_tokens_processed:,} ({total_tokens_processed/1e9:.2f}B)")
                 print(f"   Val Loss: {eval_metrics['val_loss']:.4f}")
                 print(f"   Val Accuracy: {eval_metrics['val_accuracy']:.4f}")
                 print(f"   Val Perplexity: {eval_metrics['val_perplexity']:.2f}")
@@ -294,12 +305,13 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
 
             # Milestone evaluations
             if step in config.log_milestones:
-                print(f"\n🎯 Milestone {step}!")
+                print(f"\n🎯 Milestone {step}! Tokens: {total_tokens_processed:,} ({total_tokens_processed/1e9:.2f}B)")
                 eval_metrics = evaluate_model(model, val_loader, config, device)
                 print(f"   Val Loss: {eval_metrics['val_loss']:.4f}")
                 print(f"   Val Perplexity: {eval_metrics['val_perplexity']:.2f}")
 
             step += 1
+            total_tokens_processed += tokens_per_step
             if step % 20 == 0:
                 pbar.update(20)
 
@@ -315,6 +327,8 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
     print(f"✅ Training Complete!")
     print(f"{'='*70}")
     print(f"⏱️  Total time: {total_time/3600:.2f} hours")
+    print(f"🔢 Tokens processed: {total_tokens_processed:,} ({total_tokens_processed/1e9:.2f}B)")
+    print(f"⚡ Average throughput: {total_tokens_processed/total_time:.1f} tokens/sec")
     print(f"📊 Final metrics:")
     print(f"   Val Loss: {final_eval['val_loss']:.4f}")
     print(f"   Val Accuracy: {final_eval['val_accuracy']:.4f}")
@@ -341,6 +355,8 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
         },
         'final_metrics': final_eval,
         'training_time_hours': total_time / 3600,
+        'total_tokens_processed': total_tokens_processed,
+        'average_tokens_per_sec': total_tokens_processed / total_time,
         'eval_history': {
             'steps': eval_steps,
             'losses': eval_losses,
