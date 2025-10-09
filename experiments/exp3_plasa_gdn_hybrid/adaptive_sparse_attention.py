@@ -464,4 +464,3 @@ def print_schedule_info(config: LayerSparsityConfig, n_layers: int):
 
         print(f"Layer {i:<4} {ratio:<15.2%} {function:<30}")
     print(f"{'='*80}\n")
->>>>>>> e8f2fc47e63993a97bc8e16b3b827a7c313d98bf
