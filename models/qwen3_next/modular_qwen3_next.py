@@ -437,24 +437,16 @@ class Qwen3NextGatedDeltaNet(nn.Module):
         A = torch.empty(self.num_v_heads).uniform_(0, 16)
         self.A_log = nn.Parameter(torch.log(A))
 
-        self.norm = (
-            Qwen3NextRMSNormGated(self.head_v_dim, eps=self.layer_norm_epsilon)
-            if FusedRMSNormGated is None
-            else FusedRMSNormGated(
-                self.head_v_dim,
-                eps=self.layer_norm_epsilon,
-                activation=self.activation,
-                device=torch.cuda.current_device(),
-                dtype=config.dtype if config.dtype is not None else torch.get_current_dtype(),
-            )
-        )
+        # Force use of torch implementation instead of FLA
+        self.norm = Qwen3NextRMSNormGated(self.head_v_dim, eps=self.layer_norm_epsilon)
 
         self.out_proj = nn.Linear(self.value_dim, self.hidden_size, bias=False)
 
-        self.causal_conv1d_fn = causal_conv1d_fn
-        self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
-        self.chunk_gated_delta_rule = chunk_gated_delta_rule or torch_chunk_gated_delta_rule
-        self.recurrent_gated_delta_rule = fused_recurrent_gated_delta_rule or torch_recurrent_gated_delta_rule
+        # Force use of torch implementations
+        self.causal_conv1d_fn = None
+        self.causal_conv1d_update = torch_causal_conv1d_update
+        self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
+        self.recurrent_gated_delta_rule = torch_recurrent_gated_delta_rule
 
         if not is_fast_path_available:
             logger.warning_once(
