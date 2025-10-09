@@ -1,4 +1,4 @@
-# Experiment 6: 18B MoE Training - Summary
+# Experiment 4: 18B MoE Training - Summary
 
 ## Objective
 Train an 18 billion parameter Mixture of Experts (MoE) language model optimized for NVIDIA B200 GPU with 192GB VRAM, utilizing gradient checkpointing and the Muon optimizer for memory efficiency.
@@ -92,7 +92,7 @@ Train an 18 billion parameter Mixture of Experts (MoE) language model optimized 
 ## Files Created
 
 ```
-experiments/exp6_18b_moe_training/
+experiments/exp4_18b_moe_training/
 ├── __init__.py                  # Module exports
 ├── config_18b.py               # 18B model configuration
 ├── models_18b.py               # Model with gradient checkpointing
@@ -117,7 +117,7 @@ experiments/exp6_18b_moe_training/
 
 ### 1. Verify Setup
 ```bash
-cd experiments/exp6_18b_moe_training
+cd experiments/exp4_18b_moe_training
 python test_setup.py
 ```
 

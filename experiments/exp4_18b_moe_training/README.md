@@ -1,4 +1,4 @@
-# Experiment 6: 18B Parameter MoE Training
+# Experiment 4: 18B Parameter MoE Training
 
 ## Overview
 
@@ -92,7 +92,7 @@ python -c "import torch; print(torch.cuda.get_device_name(), torch.cuda.get_devi
 
 ### Run Training
 ```bash
-cd experiments/exp6_18b_moe_training
+cd experiments/exp4_18b_moe_training
 python run_experiment.py
 ```
 

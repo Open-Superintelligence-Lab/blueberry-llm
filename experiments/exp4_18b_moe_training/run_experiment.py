@@ -8,8 +8,8 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from torch.utils.data import DataLoader
-from experiments.exp6_18b_moe_training.config_18b import MoE18BConfig
-from experiments.exp6_18b_moe_training.trainer_18b import train_18b_model
+from experiments.exp4_18b_moe_training.config_18b import MoE18BConfig
+from experiments.exp4_18b_moe_training.trainer_18b import train_18b_model
 from data.loader import load_and_cache_data
 from data.dataset import TextTokenDataset
 from utils.helpers import set_seed

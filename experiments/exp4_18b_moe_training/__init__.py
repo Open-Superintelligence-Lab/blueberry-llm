@@ -1,5 +1,5 @@
 """
-Experiment 6: 18B Parameter MoE Training
+Experiment 4: 18B Parameter MoE Training
 
 This module contains the implementation of an 18 billion parameter
 Mixture of Experts language model optimized for NVIDIA B200 GPUs.

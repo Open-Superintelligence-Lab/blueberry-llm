@@ -107,7 +107,7 @@ def save_checkpoint(model, optimizers, schedulers, step, config, save_dir, metri
 
 def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
     """Train the 18B MoE model"""
-    from experiments.exp6_18b_moe_training.models_18b import MoE18BLLM
+    from experiments.exp4_18b_moe_training.models_18b import MoE18BLLM
     
     # Print configuration
     config.print_stats()

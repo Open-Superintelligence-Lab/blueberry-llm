@@ -9,8 +9,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from experiments.exp6_18b_moe_training.config_18b import MoE18BConfig
-from experiments.exp6_18b_moe_training.models_18b import MoE18BLLM
+from experiments.exp4_18b_moe_training.config_18b import MoE18BConfig
+from experiments.exp4_18b_moe_training.models_18b import MoE18BLLM
 
 
 def test_model_creation():
