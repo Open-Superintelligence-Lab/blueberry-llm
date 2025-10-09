@@ -105,8 +105,58 @@ def save_checkpoint(model, optimizers, schedulers, step, config, save_dir, metri
     torch.save(checkpoint, latest_path)
 
 
-def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
-    """Train the 18B MoE model"""
+def load_checkpoint(checkpoint_path, model, optimizers=None, schedulers=None, device='cuda'):
+    """Load model checkpoint and optionally optimizer/scheduler states
+    
+    Args:
+        checkpoint_path: Path to checkpoint file
+        model: Model to load weights into
+        optimizers: List of optimizers to load states into (optional)
+        schedulers: List of schedulers to load states into (optional)
+        device: Device to load tensors to
+        
+    Returns:
+        Tuple of (loaded_step, config, metrics)
+    """
+    print(f"📂 Loading checkpoint from: {checkpoint_path}")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Load model weights
+    model.load_state_dict(checkpoint['model_state_dict'])
+    print(f"✅ Model weights loaded (step {checkpoint['step']})")
+    
+    # Optionally load optimizer states
+    if optimizers is not None and 'optimizer_states' in checkpoint:
+        for opt, state in zip(optimizers, checkpoint['optimizer_states']):
+            opt.load_state_dict(state)
+        print(f"✅ Optimizer states loaded")
+    
+    # Optionally load scheduler states
+    if schedulers is not None and 'scheduler_states' in checkpoint:
+        for sched, state in zip(schedulers, checkpoint['scheduler_states']):
+            sched.load_state_dict(state)
+        print(f"✅ Scheduler states loaded")
+    
+    loaded_step = checkpoint['step']
+    config = checkpoint.get('config', None)
+    metrics = checkpoint.get('metrics', None)
+    
+    if metrics:
+        print(f"📊 Checkpoint metrics: {metrics}")
+    
+    return loaded_step, config, metrics
+
+
+def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints', checkpoint_path=None):
+    """Train the 18B MoE model
+    
+    Args:
+        config: Model configuration
+        train_loader: Training data loader
+        val_loader: Validation data loader
+        save_dir: Directory to save checkpoints
+        checkpoint_path: Path to checkpoint to resume from (optional)
+    """
     from experiments.exp4_18b_moe_training.models_18b import MoE18BLLM
     
     # Print configuration
@@ -171,11 +221,25 @@ def train_18b_model(config, train_loader, val_loader, save_dir='checkpoints'):
 
     scaler = GradScaler() if config.use_amp else None
 
+    # Load checkpoint if provided
+    start_step = 0
+    if checkpoint_path is not None:
+        print(f"\n🔄 Resuming from checkpoint...")
+        loaded_step, _, _ = load_checkpoint(
+            checkpoint_path, 
+            model, 
+            optimizers=optimizers, 
+            schedulers=schedulers,
+            device=device
+        )
+        start_step = loaded_step
+        print(f"▶️  Resuming training from step {start_step}")
+
     # Training state
     model.train()
-    step = 0
+    step = start_step
     start_time = time.time()
-    total_tokens_processed = 0
+    total_tokens_processed = start_step * config.batch_size * config.max_seq_len
     tokens_per_step = config.batch_size * config.max_seq_len
     
     # Metrics tracking
