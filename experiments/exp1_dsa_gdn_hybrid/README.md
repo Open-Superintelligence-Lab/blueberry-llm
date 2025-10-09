@@ -1,5 +1,14 @@
 # DeepSeek Sparse Attention (DSA) + Gated DeltaNet (GDN) Hybrid Attention Variants
 
+> **Version Notice**
+> 
+> This experiment is validated on git tag: `git checkout experiments-v1.0`
+> 
+> Later commits may introduce breaking changes. 
+>
+> To return to the latest version:
+> `git checkout main`
+
 ## Research Questions
 
 1. Can replacing full attention with DeepSeek Sparse Attention (DSA) improve the efficiency and performance of a hybrid attention architecture that combines full attention and Gated DeltaNet (GDN)?

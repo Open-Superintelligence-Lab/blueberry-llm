@@ -1,5 +1,14 @@
 # Per-Layer Adaptive Sparse Attention (PLASA) + Gated DeltaNet Hybrid Experiment
 
+> **Version Notice**
+> 
+> This experiment is validated on git tag: `git checkout experiments-v1.0`
+> 
+> Later commits may introduce breaking changes. 
+>
+> To return to the latest version:
+> `git checkout main`
+
 ## Overview
 
 This experiment tests whether **Per-Layer Adaptive Sparse Attention (PLASA)** with progressive sparsity scheduling can improve upon the DeepSeek Sparse Attention (DSA) approach tested in Experiment 1.
