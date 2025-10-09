@@ -249,8 +249,13 @@ class Qwen3NextConfig(PretrainedConfig):
                 "linear_attention" if bool((i + 1) % interval_pattern) else "full_attention"
                 for i in range(self.num_hidden_layers)
             ]
-        # Only validate if not using DSA (which is not in standard layer_types)
-        if not any("dsa" in lt for lt in self.layer_types):
+        # Only validate if not using custom layer types (DSA, PLASA, etc.)
+        custom_layer_types = ["dsa", "plasa"]
+        has_custom_layers = any(
+            any(custom_type in lt for custom_type in custom_layer_types)
+            for lt in self.layer_types
+        )
+        if not has_custom_layers:
             layer_type_validation(self.layer_types, self.num_hidden_layers)
 
         # linear attention part

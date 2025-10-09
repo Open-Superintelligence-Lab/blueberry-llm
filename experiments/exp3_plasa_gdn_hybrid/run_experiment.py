@@ -132,12 +132,6 @@ def train_epoch_with_history(model, dataloader, optimizer, device, max_steps, to
 
 # 8 Attention Patterns to test
 ALL_PATTERNS = {
-    # Original patterns (F = full_attention, L = linear_attention)
-    "1_sandwich": ["linear_attention", "full_attention", "full_attention", "linear_attention"],
-    "2_alternating": ["full_attention", "linear_attention", "full_attention", "linear_attention"],
-    "3_linear_first": ["linear_attention", "linear_attention", "full_attention", "full_attention"],
-    "4_full_first": ["full_attention", "full_attention", "linear_attention", "linear_attention"],
-
     # PLASA patterns (P = plasa_attention with PROGRESSIVE_SPARSE, L = linear_attention)
     "5_plasa_sandwich": ["linear_attention", "plasa_attention", "plasa_attention", "linear_attention"],
     "6_plasa_alternating": ["plasa_attention", "linear_attention", "plasa_attention", "linear_attention"],
