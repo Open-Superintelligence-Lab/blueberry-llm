@@ -27,7 +27,7 @@ class AblationConfig:
 
 LARGE_BATCH_001 = AblationConfig(
     name="large_batch_lr001",
-    batch_size=104,      # ← Edit: increase to use more memory
+    batch_size=104,      
     seq_len=256,
     lr=0.01,
     grad_accum=1,
@@ -37,7 +37,7 @@ LARGE_BATCH_001 = AblationConfig(
 LONG_SEQ_001 = AblationConfig(
     name="long_seq_lr001",
     batch_size=6,
-    seq_len=4096,       # ← Edit: increase for longer context
+    seq_len=4096,       
     lr=0.01,
     grad_accum=1,
     max_steps=100
@@ -45,7 +45,7 @@ LONG_SEQ_001 = AblationConfig(
 
 BALANCED_001 = AblationConfig(
     name="balanced_lr001",
-    batch_size=26,      # ← Edit: balance between batch & seqlen
+    batch_size=26,      
     seq_len=1024,
     lr=0.01,
     grad_accum=1,
@@ -54,7 +54,7 @@ BALANCED_001 = AblationConfig(
 
 LARGE_BATCH_002 = AblationConfig(
     name="large_batch_lr002",
-    batch_size=104,      # ← Edit: increase to use more memory
+    batch_size=104,      
     seq_len=256,
     lr=0.02,
     grad_accum=1,
@@ -64,7 +64,7 @@ LARGE_BATCH_002 = AblationConfig(
 LONG_SEQ_002 = AblationConfig(
     name="long_seq_lr002",
     batch_size=6,
-    seq_len=4096,       # ← Edit: increase for longer context
+    seq_len=4096,       
     lr=0.02,
     grad_accum=1,
     max_steps=100
@@ -72,43 +72,43 @@ LONG_SEQ_002 = AblationConfig(
 
 BALANCED_002 = AblationConfig(
     name="balanced_lr002",
-    batch_size=26,      # ← Edit: balance between batch & seqlen
+    batch_size=26,      
     seq_len=1024,
     lr=0.02,
     grad_accum=1,
     max_steps=100
 )
 
-LARGE_BATCH_0005 = AblationConfig(
-    name="large_batch_lr0005",
-    batch_size=104,      # ← Edit: increase to use more memory
-    seq_len=256,
-    lr=0.005,
-    grad_accum=1,
-    max_steps=100
-)
+# LARGE_BATCH_0005 = AblationConfig(
+#     name="large_batch_lr0005",
+#     batch_size=104,      
+#     seq_len=256,
+#     lr=0.005,
+#     grad_accum=1,
+#     max_steps=100
+# )
 
-LONG_SEQ_0005 = AblationConfig(
-    name="long_seq_lr0005",
-    batch_size=6,
-    seq_len=4096,       # ← Edit: increase for longer context
-    lr=0.005,
-    grad_accum=1,
-    max_steps=100
-)
+# LONG_SEQ_0005 = AblationConfig(
+#     name="long_seq_lr0005",
+#     batch_size=6,
+#     seq_len=4096,       
+#     lr=0.005,
+#     grad_accum=1,
+#     max_steps=100
+# )
 
-BALANCED_0005 = AblationConfig(
-    name="balanced_lr0005",
-    batch_size=26,      # ← Edit: balance between batch & seqlen
-    seq_len=1024,
-    lr=0.005,
-    grad_accum=1,
-    max_steps=100
-)
+# BALANCED_0005 = AblationConfig(
+#     name="balanced_lr0005",
+#     batch_size=26,      
+#     seq_len=1024,
+#     lr=0.005,
+#     grad_accum=1,
+#     max_steps=100
+# )
 
 LARGE_BATCH_003 = AblationConfig(
     name="large_batch_lr003",
-    batch_size=104,      # ← Edit: increase to use more memory
+    batch_size=104,      
     seq_len=256,
     lr=0.03,
     grad_accum=1,
@@ -118,7 +118,7 @@ LARGE_BATCH_003 = AblationConfig(
 LONG_SEQ_003 = AblationConfig(
     name="long_seq_lr003",
     batch_size=6,
-    seq_len=4096,       # ← Edit: increase for longer context
+    seq_len=4096,       
     lr=0.03,
     grad_accum=1,
     max_steps=100
@@ -126,7 +126,7 @@ LONG_SEQ_003 = AblationConfig(
 
 BALANCED_003 = AblationConfig(
     name="balanced_lr003",
-    batch_size=26,      # ← Edit: balance between batch & seqlen
+    batch_size=26,      
     seq_len=1024,
     lr=0.03,
     grad_accum=1,
@@ -135,7 +135,7 @@ BALANCED_003 = AblationConfig(
 
 LARGE_BATCH_004 = AblationConfig(
     name="large_batch_lr004",
-    batch_size=104,      # ← Edit: increase to use more memory
+    batch_size=104,      
     seq_len=256,
     lr=0.04,
     grad_accum=1,
@@ -145,7 +145,7 @@ LARGE_BATCH_004 = AblationConfig(
 LONG_SEQ_004 = AblationConfig(
     name="long_seq_lr004",
     batch_size=6,
-    seq_len=4096,       # ← Edit: increase for longer context
+    seq_len=4096,       
     lr=0.04,
     grad_accum=1,
     max_steps=100
@@ -153,7 +153,7 @@ LONG_SEQ_004 = AblationConfig(
 
 BALANCED_004 = AblationConfig(
     name="balanced_lr004",
-    batch_size=26,      # ← Edit: balance between batch & seqlen
+    batch_size=26,      
     seq_len=1024,
     lr=0.04,
     grad_accum=1,
@@ -163,11 +163,6 @@ BALANCED_004 = AblationConfig(
 
 # Registry: add configs here to run them
 CONFIGS = {
-    # LR = 0.005 configs
-    'large_batch_lr0005': LARGE_BATCH_0005,
-    'long_seq_lr0005': LONG_SEQ_0005,
-    'balanced_lr0005': BALANCED_0005,
-    
     # LR = 0.01 configs
     'large_batch_lr001': LARGE_BATCH_001,
     'long_seq_lr001': LONG_SEQ_001,

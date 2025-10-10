@@ -9,11 +9,11 @@ from pathlib import Path
 
 results_dir = Path("results/ablation_batch_seqlen")
 
-# All 15 configurations (5 LRs × 3 strategies)
+# All 12 configurations (4 LRs × 3 strategies)
 configs = [
-    'large_batch_lr0005', 'large_batch_lr001', 'large_batch_lr002', 'large_batch_lr003', 'large_batch_lr004',
-    'long_seq_lr0005', 'long_seq_lr001', 'long_seq_lr002', 'long_seq_lr003', 'long_seq_lr004',
-    'balanced_lr0005', 'balanced_lr001', 'balanced_lr002', 'balanced_lr003', 'balanced_lr004',
+    'large_batch_lr001', 'large_batch_lr002', 'large_batch_lr003', 'large_batch_lr004',
+    'long_seq_lr001', 'long_seq_lr002', 'long_seq_lr003', 'long_seq_lr004',
+    'balanced_lr001', 'balanced_lr002', 'balanced_lr003', 'balanced_lr004',
 ]
 
 # Strategy colors
@@ -34,13 +34,13 @@ for config_name in configs:
 print(f"✅ Loaded {len(all_data)} configurations")
 
 # ============================================================================
-# PLOT 1: Validation Loss vs Time (5 subplots by LR)
+# PLOT 1: Validation Loss vs Time (4 subplots by LR)
 # ============================================================================
-fig, axes = plt.subplots(1, 5, figsize=(30, 6))
+fig, axes = plt.subplots(1, 4, figsize=(24, 6))
 fig.suptitle('Validation Loss vs Training Time - All Configurations', 
              fontsize=18, fontweight='bold', y=0.98)
 
-learning_rates = [0.005, 0.01, 0.02, 0.03, 0.04]
+learning_rates = [0.01, 0.02, 0.03, 0.04]
 
 for idx, lr in enumerate(learning_rates):
     ax = axes[idx]
@@ -89,9 +89,9 @@ print(f"📊 Saved: {output_file1}")
 plt.close()
 
 # ============================================================================
-# PLOT 2: Validation Loss vs Total Tokens (5 subplots by LR)
+# PLOT 2: Validation Loss vs Total Tokens (4 subplots by LR)
 # ============================================================================
-fig, axes = plt.subplots(1, 5, figsize=(30, 6))
+fig, axes = plt.subplots(1, 4, figsize=(24, 6))
 fig.suptitle('Validation Loss vs Total Tokens Processed - All Configurations', 
              fontsize=18, fontweight='bold', y=0.98)
 

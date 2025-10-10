@@ -28,7 +28,7 @@ from optimizers.muon import Muon
 from utils.helpers import set_seed
 
 # ============= CONFIGURABLE PARAMETERS =============
-VALIDATION_INTERVAL = 10  # Run validation every N steps (easy to change!)
+VALIDATION_INTERVAL = 25  # Run validation every N steps (easy to change!)
 # ===================================================
 
 
