@@ -15,6 +15,7 @@ import torch.nn.functional as F
 import math
 import time
 import json
+import argparse
 from dataclasses import dataclass, replace
 from typing import Dict, List
 from torch.utils.data import DataLoader
@@ -175,7 +176,7 @@ def train_single_config(ablation_config: AblationConfig, base_config: SimpleTran
     # Simple linear warmup
     def lr_lambda(step):
         warmup = max_steps // 20
-        return min(1.0, step / warmup)
+        return min(1.0, step / warmup) if warmup > 0 else 1.0
     
     schedulers = [torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda) for opt in optimizers]
     scaler = GradScaler() if config.use_amp else None
@@ -381,6 +382,15 @@ def train_single_config(ablation_config: AblationConfig, base_config: SimpleTran
 
 
 def main():
+    parser = argparse.ArgumentParser(description='MoE Ablation: Batch vs SeqLen')
+    parser.add_argument('--batch', type=int, help='Batch size (e.g., 64)')
+    parser.add_argument('--seqlen', type=int, help='Sequence length (e.g., 256)')
+    parser.add_argument('--lr', type=float, help='Learning rate (e.g., 0.01)')
+    parser.add_argument('--grad-accum', type=int, default=1, help='Gradient accumulation steps')
+    parser.add_argument('--steps', type=int, default=20, help='Training steps')
+    parser.add_argument('--name', type=str, default='custom', help='Config name')
+    args = parser.parse_args()
+    
     print("\n" + "="*80)
     print("🔬 ABLATION STUDY: BATCH SIZE vs SEQUENCE LENGTH")
     print("="*80)
@@ -401,7 +411,16 @@ def main():
     base_config = SimpleTransformerConfig(vocab_size=temp_moe_config.vocab_size)
     
     # Create ablation configurations
-    ablation_configs = create_ablation_configs()
+    if args.batch and args.seqlen and args.lr:
+        # Single custom config
+        ablation_configs = [AblationConfig(
+            name=args.name, batch_size=args.batch, seq_len=args.seqlen, 
+            lr=args.lr, grad_accum=args.grad_accum
+        )]
+        print(f"\n🎯 Running custom config: {args.name}")
+        print(f"   Batch={args.batch}, SeqLen={args.seqlen}, LR={args.lr}, GradAccum={args.grad_accum}")
+    else:
+        ablation_configs = create_ablation_configs()
     
     # We'll create separate dataloaders for each config
     all_results = []
@@ -432,7 +451,7 @@ def main():
         
         # Train this configuration
         result = train_single_config(
-            abl_config, base_config, train_loader, val_loader, device, max_steps=20
+            abl_config, base_config, train_loader, val_loader, device, max_steps=args.steps
         )
         all_results.append(result)
         
