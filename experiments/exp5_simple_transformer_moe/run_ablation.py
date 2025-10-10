@@ -114,6 +114,9 @@ def train(config_name):
     start_time = time.time()
     total_tokens = 0
     
+    # Track training curves
+    train_history = []
+    
     pbar = tqdm(total=abl_config.max_steps, desc=abl_config.name)
     train_iter = iter(train_loader)
     
@@ -175,6 +178,15 @@ def train(config_name):
         
         with torch.no_grad():
             acc = (logits.argmax(-1) == y).float().mean().item()
+        
+        # Save training point
+        train_history.append({
+            'step': step,
+            'time': elapsed,
+            'tokens': total_tokens,
+            'loss': ce_loss.item(),
+            'acc': acc
+        })
         
         pbar.set_postfix({'loss': f'{ce_loss.item():.4f}', 'acc': f'{acc:.3f}', 'tok/s': f'{tok_s:.0f}'})
         
@@ -243,7 +255,8 @@ def train(config_name):
         'val_acc': val_acc,
         'throughput': avg_tok_s,
         'time': total_time,
-        'peak_memory_gb': torch.cuda.max_memory_allocated()/1e9 if torch.cuda.is_available() else 0
+        'peak_memory_gb': torch.cuda.max_memory_allocated()/1e9 if torch.cuda.is_available() else 0,
+        'train_history': train_history  # Add training curves
     }
     
     with open(f'results/ablation_batch_seqlen/{abl_config.name}_result.json', 'w') as f:

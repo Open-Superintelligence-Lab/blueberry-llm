@@ -36,7 +36,7 @@ LARGE_BATCH = AblationConfig(
 
 LONG_SEQ = AblationConfig(
     name="long_seq", 
-    batch_size=4,
+    batch_size=6,
     seq_len=4096,       # ← Edit: increase for longer context
     lr=0.01,
     grad_accum=1,
