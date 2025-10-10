@@ -106,9 +106,68 @@ BALANCED_0005 = AblationConfig(
     max_steps=30
 )
 
+LARGE_BATCH_003 = AblationConfig(
+    name="large_batch_lr003",
+    batch_size=104,      # ← Edit: increase to use more memory
+    seq_len=256,
+    lr=0.03,
+    grad_accum=1,
+    max_steps=30
+)
+
+LONG_SEQ_003 = AblationConfig(
+    name="long_seq_lr003",
+    batch_size=6,
+    seq_len=4096,       # ← Edit: increase for longer context
+    lr=0.03,
+    grad_accum=1,
+    max_steps=30
+)
+
+BALANCED_003 = AblationConfig(
+    name="balanced_lr003",
+    batch_size=26,      # ← Edit: balance between batch & seqlen
+    seq_len=1024,
+    lr=0.03,
+    grad_accum=1,
+    max_steps=30
+)
+
+LARGE_BATCH_004 = AblationConfig(
+    name="large_batch_lr004",
+    batch_size=104,      # ← Edit: increase to use more memory
+    seq_len=256,
+    lr=0.04,
+    grad_accum=1,
+    max_steps=30
+)
+
+LONG_SEQ_004 = AblationConfig(
+    name="long_seq_lr004",
+    batch_size=6,
+    seq_len=4096,       # ← Edit: increase for longer context
+    lr=0.04,
+    grad_accum=1,
+    max_steps=30
+)
+
+BALANCED_004 = AblationConfig(
+    name="balanced_lr004",
+    batch_size=26,      # ← Edit: balance between batch & seqlen
+    seq_len=1024,
+    lr=0.04,
+    grad_accum=1,
+    max_steps=30
+)
+
 
 # Registry: add configs here to run them
 CONFIGS = {
+    # LR = 0.005 configs
+    'large_batch_lr0005': LARGE_BATCH_0005,
+    'long_seq_lr0005': LONG_SEQ_0005,
+    'balanced_lr0005': BALANCED_0005,
+    
     # LR = 0.01 configs
     'large_batch_lr001': LARGE_BATCH_001,
     'long_seq_lr001': LONG_SEQ_001,
@@ -119,9 +178,14 @@ CONFIGS = {
     'long_seq_lr002': LONG_SEQ_002,
     'balanced_lr002': BALANCED_002,
 
-    # LR = 0.005 configs
-    'large_batch_lr0005': LARGE_BATCH_0005,
-    'long_seq_lr0005': LONG_SEQ_0005,
-    'balanced_lr0005': BALANCED_0005,
+    # LR = 0.03 configs (NEW)
+    'large_batch_lr003': LARGE_BATCH_003,
+    'long_seq_lr003': LONG_SEQ_003,
+    'balanced_lr003': BALANCED_003,
+    
+    # LR = 0.04 configs (NEW)
+    'large_batch_lr004': LARGE_BATCH_004,
+    'long_seq_lr004': LONG_SEQ_004,
+    'balanced_lr004': BALANCED_004,
 }
 
