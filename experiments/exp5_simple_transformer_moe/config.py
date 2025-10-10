@@ -20,7 +20,7 @@ class SimpleTransformerConfig:
     
     # Training parameters
     batch_size: int = 24
-    max_steps: int = 20000
+    max_steps: int = 20
     gradient_accumulation_steps: int = 4
     
     # Optimizer parameters
