@@ -60,9 +60,57 @@ We expect this baseline to:
 
 ## Running the Experiment
 
+**Default (50M model):**
 ```bash
 cd experiments/exp5_simple_transformer_moe
 python run_experiment.py
+```
+
+**Scale to 1.5B params ($5 budget optimal):**
+```bash
+# First, find optimal config for your budget
+python scale_model.py --budget 5 --compare
+
+# Then update run_experiment.py to use config_1.5B instead of config
+# Or modify config.py directly with the suggested parameters
+```
+
+## Performance Tracking
+
+Training now includes **comprehensive tokens/sec tracking**:
+- ⚡ **Progress bar**: Shows real-time tokens/sec during training
+- 📊 **Evaluation logs**: Includes tokens/sec every 500 steps
+- 🎯 **Milestone logs**: Reports throughput at key checkpoints
+- 📈 **Visualization**: Dedicated plot showing throughput over time
+- 💾 **JSON metrics**: Full tokens/sec history saved to results
+
+## Ablation Studies
+
+### Batch Size vs Sequence Length
+Research question: **What's better to fill GPU memory with?**
+
+```bash
+python ablation_batch_vs_seqlen.py
+```
+
+This runs a comprehensive ablation comparing:
+- **Large Batch (64×256)**: Maximize batch size with short sequences
+- **Long Sequence (8×1024)**: Maximize sequence length with small batches  
+- **Balanced (24×512)**: Standard balanced approach
+
+Each strategy is tested with 3 different learning rates (0.005, 0.01, 0.02).
+
+**Visualize results:**
+```bash
+python plot_ablation_results.py
+```
+
+### Budget Optimization
+
+**Find the best model size for your budget:**
+```bash
+python scale_model.py --budget 5 --compare    # Compare H100 vs B200
+python scale_model.py --budget 10 --gpu h100  # H100 specific
 ```
 
 ## Results
@@ -70,8 +118,9 @@ python run_experiment.py
 Results will be saved to `results/` directory including:
 - Training metrics and loss curves
 - Validation performance
+- **Tokens/sec throughput metrics**
 - Model checkpoints
-- Visualization plots
+- Visualization plots (including throughput graph)
 
 ## Key Differences from Other Experiments
 

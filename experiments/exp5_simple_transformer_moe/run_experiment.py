@@ -166,6 +166,8 @@ def train(config, train_loader, val_loader, device):
     print(f"   Batch size: {config.batch_size}")
     print(f"   Gradient accumulation: {config.gradient_accumulation_steps}")
     print(f"   Effective batch size: {config.batch_size * config.gradient_accumulation_steps}")
+    print(f"   Sequence length: {config.max_seq_len}")
+    print(f"   Tokens per step: {config.batch_size * config.max_seq_len:,}")
     print(f"   Muon LR: {config.muon_lr}")
     print(f"   AdamW LR: {config.adamw_lr}")
     print(f"   Mixed precision: {config.use_amp}")
@@ -180,8 +182,10 @@ def train(config, train_loader, val_loader, device):
     eval_losses = []
     eval_accs = []
     eval_ppls = []
+    tokens_per_sec_history = []
     
     start_time = time.time()
+    total_tokens_processed = 0
     
     while step < config.max_steps:
         for batch_idx, (x, y) in enumerate(train_loader):
@@ -189,6 +193,10 @@ def train(config, train_loader, val_loader, device):
                 break
             
             x, y = x.to(device), y.to(device)
+            
+            # Track tokens processed
+            batch_tokens = x.numel()
+            total_tokens_processed += batch_tokens
             
             # Forward pass
             if config.use_amp:
@@ -248,19 +256,30 @@ def train(config, train_loader, val_loader, device):
                     current_loss = ce_loss.item()
                     perplexity = math.exp(min(current_loss, 20))
                     
+                    # Calculate tokens per second
+                    elapsed_time = time.time() - start_time
+                    tokens_per_sec = total_tokens_processed / elapsed_time if elapsed_time > 0 else 0
+                    
                     train_losses.append({
                         'step': step,
                         'loss': current_loss,
                         'aux_loss': aux_loss.item() if aux_loss is not None else 0.0,
                         'accuracy': accuracy,
-                        'perplexity': perplexity
+                        'perplexity': perplexity,
+                        'tokens_per_sec': tokens_per_sec
+                    })
+                    
+                    tokens_per_sec_history.append({
+                        'step': step,
+                        'tokens_per_sec': tokens_per_sec
                     })
                 
                 pbar.set_postfix({
                     'loss': f'{current_loss:.4f}',
                     'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
                     'acc': f'{accuracy:.3f}',
-                    'ppl': f'{perplexity:.1f}'
+                    'ppl': f'{perplexity:.1f}',
+                    'tok/s': f'{tokens_per_sec:.0f}'
                 })
             
             # Evaluation
@@ -272,15 +291,23 @@ def train(config, train_loader, val_loader, device):
                 eval_accs.append(eval_metrics['val_accuracy'])
                 eval_ppls.append(eval_metrics['val_perplexity'])
                 
+                # Calculate current tokens/sec
+                elapsed_time = time.time() - start_time
+                current_tokens_per_sec = total_tokens_processed / elapsed_time if elapsed_time > 0 else 0
+                
                 print(f"\n📊 Step {step}: "
                       f"Val Loss: {eval_metrics['val_loss']:.4f}, "
                       f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
-                      f"Val PPL: {eval_metrics['val_perplexity']:.2f}")
+                      f"Val PPL: {eval_metrics['val_perplexity']:.2f}, "
+                      f"Tokens/sec: {current_tokens_per_sec:,.0f}")
             
             # Milestone evaluations
             if step in config.log_milestones:
                 eval_metrics = evaluate_model(model, val_loader, config, device)
-                print(f"\n🎯 Milestone {step}: Val Loss: {eval_metrics['val_loss']:.4f}")
+                elapsed_time = time.time() - start_time
+                current_tokens_per_sec = total_tokens_processed / elapsed_time if elapsed_time > 0 else 0
+                print(f"\n🎯 Milestone {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
+                      f"Tokens/sec: {current_tokens_per_sec:,.0f}")
             
             step += 1
             if step % 20 == 0:
@@ -300,11 +327,15 @@ def train(config, train_loader, val_loader, device):
     eval_ppls.append(final_eval['val_perplexity'])
     
     total_time = time.time() - start_time
+    avg_tokens_per_sec = total_tokens_processed / total_time if total_time > 0 else 0
     
     print(f"\n🏆 Final Results:")
     print(f"   Validation Loss: {final_eval['val_loss']:.4f}")
     print(f"   Validation Accuracy: {final_eval['val_accuracy']:.4f}")
     print(f"   Validation Perplexity: {final_eval['val_perplexity']:.2f}")
+    print(f"\n⚡ Performance Metrics:")
+    print(f"   Total Tokens Processed: {total_tokens_processed:,}")
+    print(f"   Average Tokens/sec: {avg_tokens_per_sec:,.0f}")
     print(f"   Total Training Time: {total_time/60:.1f} minutes")
     print(f"   Avg Time per Step: {total_time/config.max_steps:.2f} seconds")
     
@@ -316,7 +347,10 @@ def train(config, train_loader, val_loader, device):
         'eval_losses': eval_losses,
         'eval_accs': eval_accs,
         'eval_ppls': eval_ppls,
-        'total_time': total_time
+        'total_time': total_time,
+        'total_tokens_processed': total_tokens_processed,
+        'avg_tokens_per_sec': avg_tokens_per_sec,
+        'tokens_per_sec_history': tokens_per_sec_history
     }
 
 
@@ -328,7 +362,8 @@ def plot_results(results, save_dir='results'):
     train_steps = [t['step'] for t in results['train_losses']]
     train_loss_values = [t['loss'] for t in results['train_losses']]
     
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    # Create 2x3 grid for 6 plots
+    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
     
     # Training loss
     axes[0, 0].plot(train_steps, train_loss_values, alpha=0.6, linewidth=1)
@@ -345,18 +380,37 @@ def plot_results(results, save_dir='results'):
     axes[0, 1].grid(True, alpha=0.3)
     
     # Validation accuracy
-    axes[1, 0].plot(results['eval_steps'], results['eval_accs'], 'o-', linewidth=2, markersize=6, color='green')
-    axes[1, 0].set_xlabel('Training Step')
-    axes[1, 0].set_ylabel('Validation Accuracy')
-    axes[1, 0].set_title('Validation Accuracy')
-    axes[1, 0].grid(True, alpha=0.3)
+    axes[0, 2].plot(results['eval_steps'], results['eval_accs'], 'o-', linewidth=2, markersize=6, color='green')
+    axes[0, 2].set_xlabel('Training Step')
+    axes[0, 2].set_ylabel('Validation Accuracy')
+    axes[0, 2].set_title('Validation Accuracy')
+    axes[0, 2].grid(True, alpha=0.3)
     
     # Validation perplexity
-    axes[1, 1].plot(results['eval_steps'], results['eval_ppls'], 'o-', linewidth=2, markersize=6, color='red')
-    axes[1, 1].set_xlabel('Training Step')
-    axes[1, 1].set_ylabel('Validation Perplexity')
-    axes[1, 1].set_title('Validation Perplexity')
-    axes[1, 1].grid(True, alpha=0.3)
+    axes[1, 0].plot(results['eval_steps'], results['eval_ppls'], 'o-', linewidth=2, markersize=6, color='red')
+    axes[1, 0].set_xlabel('Training Step')
+    axes[1, 0].set_ylabel('Validation Perplexity')
+    axes[1, 0].set_title('Validation Perplexity')
+    axes[1, 0].grid(True, alpha=0.3)
+    
+    # Tokens per second over time
+    if results['tokens_per_sec_history']:
+        tok_steps = [t['step'] for t in results['tokens_per_sec_history']]
+        tok_per_sec = [t['tokens_per_sec'] for t in results['tokens_per_sec_history']]
+        axes[1, 1].plot(tok_steps, tok_per_sec, linewidth=2, color='purple')
+        axes[1, 1].set_xlabel('Training Step')
+        axes[1, 1].set_ylabel('Tokens/sec')
+        axes[1, 1].set_title('Training Throughput (Tokens/sec)')
+        axes[1, 1].grid(True, alpha=0.3)
+        axes[1, 1].ticklabel_format(style='plain', axis='y')
+    
+    # Training accuracy over time (from train_losses)
+    train_accs = [t.get('accuracy', 0) for t in results['train_losses']]
+    axes[1, 2].plot(train_steps, train_accs, alpha=0.6, linewidth=1, color='orange')
+    axes[1, 2].set_xlabel('Training Step')
+    axes[1, 2].set_ylabel('Training Accuracy')
+    axes[1, 2].set_title('Training Accuracy Over Time')
+    axes[1, 2].grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig(f'{save_dir}/training_curves.png', dpi=300, bbox_inches='tight')
@@ -380,6 +434,7 @@ def save_results(results, config, save_dir='results'):
             'expert_top_k': config.expert_top_k,
             'max_steps': config.max_steps,
             'batch_size': config.batch_size,
+            'max_seq_len': config.max_seq_len,
             'muon_lr': config.muon_lr,
             'adamw_lr': config.adamw_lr,
         },
@@ -391,7 +446,13 @@ def save_results(results, config, save_dir='results'):
             'accuracies': results['eval_accs'],
             'perplexities': results['eval_ppls'],
         },
-        'total_time_minutes': results['total_time'] / 60,
+        'performance_metrics': {
+            'total_tokens_processed': results['total_tokens_processed'],
+            'avg_tokens_per_sec': results['avg_tokens_per_sec'],
+            'tokens_per_sec_history': results['tokens_per_sec_history'],
+            'total_time_seconds': results['total_time'],
+            'total_time_minutes': results['total_time'] / 60,
+        },
     }
     
     with open(f'{save_dir}/results.json', 'w') as f:
