@@ -25,8 +25,8 @@ class AblationConfig:
 
 # Edit these configs to max out your GPU memory!
 
-LARGE_BATCH = AblationConfig(
-    name="large_batch",
+LARGE_BATCH_001 = AblationConfig(
+    name="large_batch_lr001",
     batch_size=104,      # ← Edit: increase to use more memory
     seq_len=256,
     lr=0.01,
@@ -34,8 +34,8 @@ LARGE_BATCH = AblationConfig(
     max_steps=50
 )
 
-LONG_SEQ = AblationConfig(
-    name="long_seq", 
+LONG_SEQ_001 = AblationConfig(
+    name="long_seq_lr001",
     batch_size=6,
     seq_len=4096,       # ← Edit: increase for longer context
     lr=0.01,
@@ -43,8 +43,8 @@ LONG_SEQ = AblationConfig(
     max_steps=50
 )
 
-BALANCED = AblationConfig(
-    name="balanced",
+BALANCED_001 = AblationConfig(
+    name="balanced_lr001",
     batch_size=26,      # ← Edit: balance between batch & seqlen
     seq_len=1024,
     lr=0.01,
@@ -52,40 +52,55 @@ BALANCED = AblationConfig(
     max_steps=50
 )
 
-CUSTOM = AblationConfig(
-    name="custom",
-    batch_size=32,      # ← Edit freely
-    seq_len=384,
-    lr=0.015,
-    grad_accum=1,
-    max_steps=50
-)
-
-# Quick test config (fast iteration)
-QUICK_TEST = AblationConfig(
-    name="quick_test",
-    batch_size=16,
+LARGE_BATCH_002 = AblationConfig(
+    name="large_batch_lr002",
+    batch_size=104,      # ← Edit: increase to use more memory
     seq_len=256,
-    lr=0.01,
-    grad_accum=1,
-    max_steps=5
-)
-
-# Maximum memory configs (adjust based on your GPU)
-# RTX 4090 (24GB) example values:
-MAX_BATCH = AblationConfig(
-    name="max_batch",
-    batch_size=128,     # ← Push batch size limit
-    seq_len=128,
     lr=0.02,
     grad_accum=1,
     max_steps=50
 )
 
-MAX_SEQ = AblationConfig(
-    name="max_seq",
-    batch_size=4,
-    seq_len=2048,       # ← Push sequence length limit
+LONG_SEQ_002 = AblationConfig(
+    name="long_seq_lr002",
+    batch_size=6,
+    seq_len=4096,       # ← Edit: increase for longer context
+    lr=0.02,
+    grad_accum=1,
+    max_steps=50
+)
+
+BALANCED_002 = AblationConfig(
+    name="balanced_lr002",
+    batch_size=26,      # ← Edit: balance between batch & seqlen
+    seq_len=1024,
+    lr=0.02,
+    grad_accum=1,
+    max_steps=50
+)
+
+LARGE_BATCH_0005 = AblationConfig(
+    name="large_batch_lr0005",
+    batch_size=104,      # ← Edit: increase to use more memory
+    seq_len=256,
+    lr=0.005,
+    grad_accum=1,
+    max_steps=50
+)
+
+LONG_SEQ_0005 = AblationConfig(
+    name="long_seq_lr0005",
+    batch_size=6,
+    seq_len=4096,       # ← Edit: increase for longer context
+    lr=0.005,
+    grad_accum=1,
+    max_steps=50
+)
+
+BALANCED_0005 = AblationConfig(
+    name="balanced_lr0005",
+    batch_size=26,      # ← Edit: balance between batch & seqlen
+    seq_len=1024,
     lr=0.005,
     grad_accum=1,
     max_steps=50
@@ -94,12 +109,19 @@ MAX_SEQ = AblationConfig(
 
 # Registry: add configs here to run them
 CONFIGS = {
-    'large_batch': LARGE_BATCH,
-    'long_seq': LONG_SEQ,
-    'balanced': BALANCED,
-    'custom': CUSTOM,
-    'quick': QUICK_TEST,
-    'max_batch': MAX_BATCH,
-    'max_seq': MAX_SEQ,
+    # LR = 0.01 configs
+    'large_batch_lr001': LARGE_BATCH_001,
+    'long_seq_lr001': LONG_SEQ_001,
+    'balanced_lr001': BALANCED_001,
+
+    # LR = 0.02 configs
+    'large_batch_lr002': LARGE_BATCH_002,
+    'long_seq_lr002': LONG_SEQ_002,
+    'balanced_lr002': BALANCED_002,
+
+    # LR = 0.005 configs
+    'large_batch_lr0005': LARGE_BATCH_0005,
+    'long_seq_lr0005': LONG_SEQ_0005,
+    'balanced_lr0005': BALANCED_0005,
 }
 
