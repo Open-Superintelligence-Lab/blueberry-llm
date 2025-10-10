@@ -394,9 +394,11 @@ def main():
     # Load data
     print("\n📚 Loading data...")
     temp_config = SimpleTransformerConfig()
-    texts, tokenizer, tokens = load_and_cache_data(temp_config)
+    # Convert to MoEModelConfig for data loading
+    temp_moe_config = temp_config.to_moe_config()
+    texts, tokenizer, tokens = load_and_cache_data(temp_moe_config, cache_dir="data_cache")
     
-    base_config = SimpleTransformerConfig(vocab_size=temp_config.vocab_size)
+    base_config = SimpleTransformerConfig(vocab_size=temp_moe_config.vocab_size)
     
     # Create ablation configurations
     ablation_configs = create_ablation_configs()
