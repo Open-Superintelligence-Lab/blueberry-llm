@@ -105,6 +105,30 @@ Each strategy is tested with 3 different learning rates (0.005, 0.01, 0.02).
 python plot_ablation_results.py
 ```
 
+**Quick validation mode (20 steps):**
+For rapid testing of the ablation setup without long training:
+```bash
+# The script is already configured for quick testing (max_steps=20)
+python ablation_batch_vs_seqlen.py
+```
+
+**Compare strategies by learning rate:**
+Generate plots showing all strategies side-by-side for each learning rate:
+```bash
+python plot_ablation_duos.py
+```
+
+This creates 3 plots (`duo_lr005.png`, `duo_lr01.png`, `duo_lr02.png`), each comparing:
+- Training loss curves for all strategies
+- Validation metrics (loss and accuracy)
+- Training throughput (tokens/sec)
+
+**Interpreting duo plots:**
+- Each plot focuses on a single learning rate
+- Colors are consistent: Large Batch (red), Long Seq (teal), Balanced (blue)
+- Look for which strategy achieves lowest loss at each LR
+- Compare throughput vs performance trade-offs
+
 ### Budget Optimization
 
 **Find the best model size for your budget:**

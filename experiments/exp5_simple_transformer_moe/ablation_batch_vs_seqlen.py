@@ -21,9 +21,11 @@ from torch.utils.data import DataLoader
 from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 
-# Add project root to path
+# Add project root and experiment directory to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+exp_dir = os.path.dirname(__file__)
 sys.path.insert(0, project_root)
+sys.path.insert(0, exp_dir)
 
 from config import SimpleTransformerConfig
 from models import SimpleTransformerMoE
@@ -138,7 +140,7 @@ def train_single_config(ablation_config: AblationConfig, base_config: SimpleTran
                     gradient_accumulation_steps=ablation_config.grad_accum,
                     muon_lr=ablation_config.lr,
                     max_steps=max_steps,
-                    eval_every=500)
+                    eval_every=10)
     
     print(f"\n{'='*80}")
     print(f"🚀 Training: {ablation_config.name}")
@@ -425,7 +427,7 @@ def main():
         
         # Train this configuration
         result = train_single_config(
-            abl_config, base_config, train_loader, val_loader, device, max_steps=5000
+            abl_config, base_config, train_loader, val_loader, device, max_steps=20
         )
         all_results.append(result)
         
