@@ -22,8 +22,9 @@ import json
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.insert(0, project_root)
 
+# Import from global repo
 from config import SimpleTransformerConfig
-from models import SimpleTransformerMoE
+from models.moe_llm import MoEMinimalLLM
 from data.loader import load_and_cache_data
 from data.dataset import TextTokenDataset
 from optimizers.muon import Muon
@@ -127,11 +128,14 @@ def train(config, train_loader, val_loader, device):
     
     # Initialize model
     set_seed(42)
-    model = SimpleTransformerMoE(config).to(device)
+    # Convert SimpleTransformerConfig to MoEModelConfig for compatibility with global model
+    moe_config = config.to_moe_config()
+    model = MoEMinimalLLM(moe_config).to(device)
     
     # Print model info
-    total_params = model.get_num_params(non_embedding=False)
-    non_embed_params = model.get_num_params(non_embedding=True)
+    total_params = sum(p.numel() for p in model.parameters())
+    embedding_params = model.token_embedding.weight.numel()
+    non_embed_params = total_params - embedding_params
     
     # Calculate active parameters (excluding MoE experts)
     active_params = 0

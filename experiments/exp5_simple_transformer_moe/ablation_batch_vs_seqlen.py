@@ -27,8 +27,9 @@ exp_dir = os.path.dirname(__file__)
 sys.path.insert(0, project_root)
 sys.path.insert(0, exp_dir)
 
+# Import from global repo
 from config import SimpleTransformerConfig
-from models import SimpleTransformerMoE
+from models.moe_llm import MoEMinimalLLM
 from data.loader import load_and_cache_data
 from data.dataset import TextTokenDataset
 from optimizers.muon import Muon
@@ -150,7 +151,9 @@ def train_single_config(ablation_config: AblationConfig, base_config: SimpleTran
     
     # Initialize model
     set_seed(42)
-    model = SimpleTransformerMoE(config).to(device)
+    # Convert SimpleTransformerConfig to MoEModelConfig for compatibility with global model
+    moe_config = config.to_moe_config()
+    model = MoEMinimalLLM(moe_config).to(device)
     
     # Setup optimizers
     muon_params = []

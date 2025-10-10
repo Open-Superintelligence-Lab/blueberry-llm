@@ -50,4 +50,34 @@ class SimpleTransformerConfig:
     def __post_init__(self):
         self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+    
+    def to_moe_config(self):
+        """Convert to MoEModelConfig for compatibility with global models"""
+        from configs.moe_config import MoEModelConfig
+        return MoEModelConfig(
+            d_model=self.d_model,
+            n_heads=self.n_heads,
+            n_layers=self.n_layers,
+            d_ff=self.d_ff,
+            batch_size=self.batch_size,
+            max_steps=self.max_steps,
+            gradient_accumulation_steps=self.gradient_accumulation_steps,
+            muon_lr=self.muon_lr,
+            muon_momentum=self.muon_momentum,
+            adamw_lr=self.adamw_lr,
+            max_seq_len=self.max_seq_len,
+            num_documents=self.num_documents,
+            max_tokens=self.max_tokens,
+            eval_every=self.eval_every,
+            eval_steps=self.eval_steps,
+            weight_decay=self.weight_decay,
+            dropout=self.dropout,
+            grad_clip=self.grad_clip,
+            use_amp=self.use_amp,
+            vocab_size=self.vocab_size,
+            log_milestones=self.log_milestones,
+            num_experts=self.num_experts,
+            expert_top_k=self.expert_top_k,
+            load_balancing_weight=self.load_balancing_weight
+        )
 
