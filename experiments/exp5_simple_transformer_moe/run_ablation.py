@@ -27,6 +27,10 @@ from data.dataset import TextTokenDataset
 from optimizers.muon import Muon
 from utils.helpers import set_seed
 
+# ============= CONFIGURABLE PARAMETERS =============
+VALIDATION_INTERVAL = 10  # Run validation every N steps (easy to change!)
+# ===================================================
+
 
 def train(config_name):
     if config_name not in CONFIGS:
@@ -116,6 +120,41 @@ def train(config_name):
     
     # Track training curves
     train_history = []
+    val_history = []  # Track validation throughout training
+    
+    # Validation function
+    def run_validation():
+        model.eval()
+        val_loss_sum = 0
+        val_acc_sum = 0
+        val_count = 0
+        
+        with torch.no_grad():
+            for i, (vx, vy) in enumerate(val_loader):
+                if i >= 50:  # Limit validation batches for speed
+                    break
+                vx, vy = vx.to(device), vy.to(device)
+                
+                # Adjust sequence length
+                if vx.size(1) != config.max_seq_len:
+                    if vx.size(1) < config.max_seq_len:
+                        pad_len = config.max_seq_len - vx.size(1)
+                        vx = F.pad(vx, (0, pad_len), value=0)
+                        vy = F.pad(vy, (0, pad_len), value=0)
+                    else:
+                        vx = vx[:, :config.max_seq_len]
+                        vy = vy[:, :config.max_seq_len]
+                
+                with autocast('cuda', dtype=torch.float16, enabled=config.use_amp):
+                    vlogits = model(vx, return_aux_loss=False)
+                    vloss = F.cross_entropy(vlogits.view(-1, config.vocab_size), vy.view(-1))
+                
+                val_loss_sum += vloss.item()
+                val_acc_sum += (vlogits.argmax(-1) == vy).float().mean().item()
+                val_count += 1
+        
+        model.train()
+        return val_loss_sum / val_count if val_count > 0 else 0, val_acc_sum / val_count if val_count > 0 else 0
     
     pbar = tqdm(total=abl_config.max_steps, desc=abl_config.name)
     train_iter = iter(train_loader)
@@ -193,6 +232,18 @@ def train(config_name):
         if ce_loss.item() < best_loss:
             best_loss = ce_loss.item()
         
+        # Periodic validation
+        if (step + 1) % VALIDATION_INTERVAL == 0 or step == 0:
+            val_loss, val_acc = run_validation()
+            val_history.append({
+                'step': step,
+                'time': elapsed,
+                'tokens': total_tokens,
+                'val_loss': val_loss,
+                'val_acc': val_acc
+            })
+            pbar.write(f"   Step {step}: Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}")
+        
         step += 1
         pbar.update(1)
     
@@ -256,7 +307,8 @@ def train(config_name):
         'throughput': avg_tok_s,
         'time': total_time,
         'peak_memory_gb': torch.cuda.max_memory_allocated()/1e9 if torch.cuda.is_available() else 0,
-        'train_history': train_history  # Add training curves
+        'train_history': train_history,  # Training curves
+        'val_history': val_history  # Validation curves throughout training
     }
     
     with open(f'results/ablation_batch_seqlen/{abl_config.name}_result.json', 'w') as f:

@@ -31,7 +31,7 @@ LARGE_BATCH_001 = AblationConfig(
     seq_len=256,
     lr=0.01,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 LONG_SEQ_001 = AblationConfig(
@@ -40,7 +40,7 @@ LONG_SEQ_001 = AblationConfig(
     seq_len=4096,       # ← Edit: increase for longer context
     lr=0.01,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 BALANCED_001 = AblationConfig(
@@ -49,7 +49,7 @@ BALANCED_001 = AblationConfig(
     seq_len=1024,
     lr=0.01,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 LARGE_BATCH_002 = AblationConfig(
@@ -58,7 +58,7 @@ LARGE_BATCH_002 = AblationConfig(
     seq_len=256,
     lr=0.02,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 LONG_SEQ_002 = AblationConfig(
@@ -67,7 +67,7 @@ LONG_SEQ_002 = AblationConfig(
     seq_len=4096,       # ← Edit: increase for longer context
     lr=0.02,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 BALANCED_002 = AblationConfig(
@@ -76,7 +76,7 @@ BALANCED_002 = AblationConfig(
     seq_len=1024,
     lr=0.02,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 LARGE_BATCH_0005 = AblationConfig(
@@ -85,7 +85,7 @@ LARGE_BATCH_0005 = AblationConfig(
     seq_len=256,
     lr=0.005,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 LONG_SEQ_0005 = AblationConfig(
@@ -94,7 +94,7 @@ LONG_SEQ_0005 = AblationConfig(
     seq_len=4096,       # ← Edit: increase for longer context
     lr=0.005,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 BALANCED_0005 = AblationConfig(
@@ -103,7 +103,7 @@ BALANCED_0005 = AblationConfig(
     seq_len=1024,
     lr=0.005,
     grad_accum=1,
-    max_steps=50
+    max_steps=30
 )
 
 
