@@ -9,11 +9,11 @@ from pathlib import Path
 
 results_dir = Path("results/ablation_batch_seqlen")
 
-# All 9 configurations
+# All 15 configurations (5 LRs × 3 strategies)
 configs = [
-    'large_batch_lr0005', 'large_batch_lr001', 'large_batch_lr002',
-    'long_seq_lr0005', 'long_seq_lr001', 'long_seq_lr002',
-    'balanced_lr0005', 'balanced_lr001', 'balanced_lr002',
+    'large_batch_lr0005', 'large_batch_lr001', 'large_batch_lr002', 'large_batch_lr003', 'large_batch_lr004',
+    'long_seq_lr0005', 'long_seq_lr001', 'long_seq_lr002', 'long_seq_lr003', 'long_seq_lr004',
+    'balanced_lr0005', 'balanced_lr001', 'balanced_lr002', 'balanced_lr003', 'balanced_lr004',
 ]
 
 # Strategy colors
@@ -34,13 +34,13 @@ for config_name in configs:
 print(f"✅ Loaded {len(all_data)} configurations")
 
 # ============================================================================
-# PLOT 1: Validation Loss vs Time (3 subplots by LR)
+# PLOT 1: Validation Loss vs Time (5 subplots by LR)
 # ============================================================================
-fig, axes = plt.subplots(1, 3, figsize=(22, 7))
+fig, axes = plt.subplots(1, 5, figsize=(30, 6))
 fig.suptitle('Validation Loss vs Training Time - All Configurations', 
              fontsize=18, fontweight='bold', y=0.98)
 
-learning_rates = [0.005, 0.01, 0.02]
+learning_rates = [0.005, 0.01, 0.02, 0.03, 0.04]
 
 for idx, lr in enumerate(learning_rates):
     ax = axes[idx]
@@ -89,9 +89,9 @@ print(f"📊 Saved: {output_file1}")
 plt.close()
 
 # ============================================================================
-# PLOT 2: Validation Loss vs Total Tokens (3 subplots by LR)
+# PLOT 2: Validation Loss vs Total Tokens (5 subplots by LR)
 # ============================================================================
-fig, axes = plt.subplots(1, 3, figsize=(22, 7))
+fig, axes = plt.subplots(1, 5, figsize=(30, 6))
 fig.suptitle('Validation Loss vs Total Tokens Processed - All Configurations', 
              fontsize=18, fontweight='bold', y=0.98)
 
@@ -174,14 +174,23 @@ for config_name in configs:
         lr = data['lr']
         if lr == 0.005:
             linestyle = '-'
+            marker = 'o'
         elif lr == 0.01:
             linestyle = '--'
-        else:
+            marker = 's'
+        elif lr == 0.02:
             linestyle = '-.'
+            marker = '^'
+        elif lr == 0.03:
+            linestyle = ':'
+            marker = 'D'
+        else:  # 0.04
+            linestyle = (0, (3, 1, 1, 1))
+            marker = 'v'
         
         label = f"{strategy}, LR={lr}"
         ax.plot(times, val_losses, linestyle=linestyle, color=color, 
-               linewidth=2, markersize=6, marker='o', label=label, alpha=0.7)
+               linewidth=2, markersize=6, marker=marker, label=label, alpha=0.7)
 
 ax.set_xlabel('Training Time (seconds)', fontsize=14, fontweight='bold')
 ax.set_ylabel('Validation Loss', fontsize=14, fontweight='bold')
@@ -215,14 +224,23 @@ for config_name in configs:
         lr = data['lr']
         if lr == 0.005:
             linestyle = '-'
+            marker = 'o'
         elif lr == 0.01:
             linestyle = '--'
-        else:
+            marker = 's'
+        elif lr == 0.02:
             linestyle = '-.'
+            marker = '^'
+        elif lr == 0.03:
+            linestyle = ':'
+            marker = 'D'
+        else:  # 0.04
+            linestyle = (0, (3, 1, 1, 1))
+            marker = 'v'
         
         label = f"{strategy}, LR={lr}"
         ax.plot(tokens_millions, val_losses, linestyle=linestyle, color=color, 
-               linewidth=2, markersize=6, marker='o', label=label, alpha=0.7)
+               linewidth=2, markersize=6, marker=marker, label=label, alpha=0.7)
 
 ax.set_xlabel('Total Tokens Processed (Millions)', fontsize=14, fontweight='bold')
 ax.set_ylabel('Validation Loss', fontsize=14, fontweight='bold')
