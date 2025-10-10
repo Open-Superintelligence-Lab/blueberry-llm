@@ -296,9 +296,10 @@ def main():
     print("="*70)
     print("ADAPTIVE SPARSE ATTENTION EXPERIMENT (EXP3)")
     print("="*70)
-    print("\nTesting 8 patterns:")
+    print("\nTesting 11 patterns:")
     print("  - 4 Original: Full Attention (F) + Linear Attention (L)")
     print("  - 4 PLASA: Per-Layer Adaptive Sparse (P) + Linear Attention (L)")
+    print("  - 3 Extra: All PLASA (P), All Full (F), All Linear (L)")
     print("\nPLASA uses PROGRESSIVE_SPARSE schedule:")
     print("  - Early layers: Dense (k=L)")
     print("  - Middle layers: Aggressive sparse (k=L/4)")
@@ -326,7 +327,7 @@ def main():
     
     # Summary Tables
     print(f"\n{'='*70}")
-    print("FINAL RESULTS - ALL 8 PATTERNS")
+    print("FINAL RESULTS - ALL PATTERNS")
     print(f"{'='*70}\n")
     
     # Sort by validation loss (best first)
