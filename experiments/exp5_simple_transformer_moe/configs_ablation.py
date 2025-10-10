@@ -160,6 +160,37 @@ BALANCED_004 = AblationConfig(
     max_steps=100
 )
 
+# ============================================================================
+# PART 2: Extended training with best LR (0.03) for 1000 steps
+# ============================================================================
+
+LARGE_BATCH_003_LONG = AblationConfig(
+    name="large_batch_lr003_1000steps",
+    batch_size=104,
+    seq_len=256,
+    lr=0.03,
+    grad_accum=1,
+    max_steps=1000
+)
+
+LONG_SEQ_003_LONG = AblationConfig(
+    name="long_seq_lr003_1000steps",
+    batch_size=6,
+    seq_len=4096,
+    lr=0.03,
+    grad_accum=1,
+    max_steps=1000
+)
+
+BALANCED_003_LONG = AblationConfig(
+    name="balanced_lr003_1000steps",
+    batch_size=26,
+    seq_len=1024,
+    lr=0.03,
+    grad_accum=1,
+    max_steps=1000
+)
+
 
 # Registry: add configs here to run them
 CONFIGS = {
@@ -182,5 +213,10 @@ CONFIGS = {
     'large_batch_lr004': LARGE_BATCH_004,
     'long_seq_lr004': LONG_SEQ_004,
     'balanced_lr004': BALANCED_004,
+    
+    # PART 2: Extended 1000-step runs with LR=0.03
+    'large_batch_lr003_1000steps': LARGE_BATCH_003_LONG,
+    'long_seq_lr003_1000steps': LONG_SEQ_003_LONG,
+    'balanced_lr003_1000steps': BALANCED_003_LONG,
 }
 

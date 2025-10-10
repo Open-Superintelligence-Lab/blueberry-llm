@@ -9,12 +9,22 @@ from pathlib import Path
 
 results_dir = Path("results/ablation_batch_seqlen")
 
-# All 12 configurations (4 LRs × 3 strategies)
-configs = [
+# Part 1: 12 configurations (4 LRs × 3 strategies) - 100 steps
+configs_part1 = [
     'large_batch_lr001', 'large_batch_lr002', 'large_batch_lr003', 'large_batch_lr004',
     'long_seq_lr001', 'long_seq_lr002', 'long_seq_lr003', 'long_seq_lr004',
     'balanced_lr001', 'balanced_lr002', 'balanced_lr003', 'balanced_lr004',
 ]
+
+# Part 2: 3 configurations (LR=0.03 × 3 strategies) - 1000 steps
+configs_part2 = [
+    'large_batch_lr003_1000steps',
+    'long_seq_lr003_1000steps',
+    'balanced_lr003_1000steps',
+]
+
+# Combine all configs
+configs = configs_part1 + configs_part2
 
 # Strategy colors
 strategy_colors = {
@@ -188,7 +198,9 @@ for config_name in configs:
             linestyle = (0, (3, 1, 1, 1))
             marker = 'v'
         
-        label = f"{strategy}, LR={lr}"
+        # Add suffix for 1000-step runs
+        suffix = " (1000s)" if "1000steps" in config_name else ""
+        label = f"{strategy}, LR={lr}{suffix}"
         ax.plot(times, val_losses, linestyle=linestyle, color=color, 
                linewidth=2, markersize=6, marker=marker, label=label, alpha=0.7)
 
@@ -238,7 +250,9 @@ for config_name in configs:
             linestyle = (0, (3, 1, 1, 1))
             marker = 'v'
         
-        label = f"{strategy}, LR={lr}"
+        # Add suffix for 1000-step runs
+        suffix = " (1000s)" if "1000steps" in config_name else ""
+        label = f"{strategy}, LR={lr}{suffix}"
         ax.plot(tokens_millions, val_losses, linestyle=linestyle, color=color, 
                linewidth=2, markersize=6, marker=marker, label=label, alpha=0.7)
 
