@@ -45,8 +45,8 @@ LONG_SEQ = AblationConfig(
 
 BALANCED = AblationConfig(
     name="balanced",
-    batch_size=24,      # ← Edit: balance between batch & seqlen
-    seq_len=512,
+    batch_size=26,      # ← Edit: balance between batch & seqlen
+    seq_len=1024,
     lr=0.01,
     grad_accum=1,
     max_steps=50
