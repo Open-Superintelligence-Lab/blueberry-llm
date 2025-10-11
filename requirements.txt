@@ -5,9 +5,9 @@ torchao
 matplotlib
 # lm-eval
 
-# FLA - Flash Linear Attention
-git+https://github.com/fla-org/flash-linear-attention
-
 # Single T4 GPU training
 # tensorstore
 # zarr
+
+# Note: Some experiments have additional requirements
+# See individual experiment directories for requirements.txt

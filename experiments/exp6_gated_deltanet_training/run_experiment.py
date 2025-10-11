@@ -1,6 +1,19 @@
 """
 Training script for Gated DeltaNet model
 Experiment 6: Pure Gated DeltaNet training with FLA optimizations
+
+Usage:
+    # Start new training
+    python run_experiment.py --config rtx4090
+    
+    # Resume from checkpoint
+    python run_experiment.py --resume checkpoints/best_model.pt
+    
+    # Resume and extend training
+    python run_experiment.py --resume checkpoints/best_model.pt --extend-steps 5000
+    
+    # Available configs: small, medium, large, xlarge, rtx4090
+    python run_experiment.py --config medium
 """
 
 import torch

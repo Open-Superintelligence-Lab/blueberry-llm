@@ -1,0 +1,6 @@
+# Experiment 6: Gated DeltaNet Training Requirements
+# Install with: pip install -r requirements.txt
+
+# FLA - Flash Linear Attention (optimized DeltaNet kernels)
+git+https://github.com/fla-org/flash-linear-attention
+
