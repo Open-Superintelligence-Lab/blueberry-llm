@@ -144,6 +144,42 @@ tail -f training_10k.log
 
 See `TRAINING_10K_STATUS.md` for detailed monitoring guide.
 
+## Dataset Size Issue & Fix
+
+### Problem Discovered
+
+Initial training showed severe overfitting:
+- **Training loss**: 10.9 → 0.088 (excellent)
+- **Validation loss**: 8.17 → 11.39 (increasing!)
+- **Root cause**: Dataset too small (5M tokens) vs consumption (614M tokens)
+- **Result**: Model saw data 123 times, memorized instead of learning
+
+### Solution
+
+Increased dataset size to match token consumption:
+
+| Config | Steps | Tokens Consumed | Dataset Size | Epochs | Status |
+|--------|-------|-----------------|--------------|--------|--------|
+| Old | 5,000 | 614M | 5M | 123x | 🚨 Overfitting |
+| **New** | 5,000 | 614M | **1B** | 0.61x | ✅ Fixed |
+
+**Formula**: `batch_size × seq_len × steps = tokens_consumed`
+- H100 5K: `120 × 1024 × 5000 = 614.4M tokens`
+- H100 10K: `120 × 1024 × 10000 = 1.23B tokens`
+
+### Training Time Estimates
+
+At ~2.6 steps/s on H100:
+
+| Scale | Tokens | Time | Steps |
+|-------|--------|------|-------|
+| Current (5K) | 614M | 1 hour | 5,000 |
+| Extended (10K) | 1.23B | 2 hours | 10,000 |
+| Large | 10B | 16 hours | 81,380 |
+| GPT-3 scale | 1T | **68 days** | 8.1M |
+
+**Memory Impact**: 1B tokens = 4GB RAM, 2B tokens = 8GB RAM (easily fits on H100)
+
 ## Model Details
 
 ### Gated DeltaNet Parameters

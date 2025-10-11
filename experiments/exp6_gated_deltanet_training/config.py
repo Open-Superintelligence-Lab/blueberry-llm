@@ -185,9 +185,10 @@ def get_h100_optimized_config():
         learning_rate=1e-3,  # Best from ablation: val_loss=6.671
         gradient_clip=1.0,
         
-        # Data
-        num_documents=2000,
-        max_tokens=5_000_000,
+        # Data - sufficient for 10k steps without repetition
+        # 120 batch × 1024 seq × 10000 steps = 1.23B tokens needed
+        num_documents=250_000,  # Increased 125x for diversity
+        max_tokens=2_000_000_000,  # 2B tokens (1.6x safety margin, ~8GB RAM)
         
         # Evaluation settings
         eval_interval=100,  # Eval every 100 steps
@@ -215,9 +216,10 @@ def get_h100_1k_checkpoint_config():
         learning_rate=1e-3,  # Best LR from ablation
         gradient_clip=1.0,
         
-        # Data
-        num_documents=2000,
-        max_tokens=5_000_000,
+        # Data - sufficient for 1k steps
+        # 120 batch × 1024 seq × 1000 steps = 123M tokens needed
+        num_documents=50_000,  # Increased 25x for diversity
+        max_tokens=200_000_000,  # 200M tokens (1.6x safety margin, ~800MB RAM)
         
         # Evaluation settings
         eval_interval=100,
@@ -227,7 +229,7 @@ def get_h100_1k_checkpoint_config():
 
 
 def get_h100_5k_config():
-    """H100 config for 5000-step training"""
+    """H100 config for 5000-step training with sufficient data"""
     return ExperimentConfig(
         # Model architecture
         hidden_size=768,
@@ -245,9 +247,10 @@ def get_h100_5k_config():
         learning_rate=1e-3,  # Best LR from ablation
         gradient_clip=1.0,
         
-        # Data
-        num_documents=2000,
-        max_tokens=5_000_000,
+        # Data - sufficient to avoid repetition
+        # 120 batch × 1024 seq × 5000 steps = 614M tokens needed
+        num_documents=200_000,  # Increased 100x to get more diverse data
+        max_tokens=1_000_000_000,  # 1B tokens (1.6x safety margin, ~4GB RAM)
         
         # Evaluation settings
         eval_interval=100,
