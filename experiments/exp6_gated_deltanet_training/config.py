@@ -152,7 +152,7 @@ def get_rtx4090_optimized_config():
         # Training params - 1000 steps
         max_steps=1000,
         warmup_steps=100,  # 10% warmup
-        learning_rate=3e-4,  # Will be updated after LR ablation
+        learning_rate=1e-3,  # Best from 200-step ablation (val_loss=6.161)
         gradient_clip=1.0,
         
         # Data - NO REPETITION for 1000 steps
