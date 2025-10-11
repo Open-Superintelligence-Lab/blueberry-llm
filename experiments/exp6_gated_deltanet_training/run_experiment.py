@@ -43,6 +43,7 @@ from experiments.exp6_gated_deltanet_training.config import (
     get_rtx4090_optimized_config,
     get_h100_optimized_config,
     get_h100_1k_checkpoint_config,
+    get_h100_5k_config,
     get_b200_optimized_config,
 )
 from experiments.exp6_gated_deltanet_training.models import (
@@ -270,7 +271,7 @@ class Trainer:
         """Save model checkpoint for training resumption"""
         checkpoint_path = self.save_dir / filename
         
-        # Save complete checkpoint including training history
+        # Save complete checkpoint including training history and data state
         checkpoint = {
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
@@ -282,6 +283,12 @@ class Trainer:
             'train_history': self.train_history,
             'val_history': self.val_history,
         }
+        
+        # Save data loader state if available (for progressive loading)
+        if hasattr(self.train_loader, 'get_state'):
+            checkpoint['train_data_state'] = self.train_loader.get_state()
+        if hasattr(self.val_loader, 'get_state'):
+            checkpoint['val_data_state'] = self.val_loader.get_state()
         
         torch.save(checkpoint, checkpoint_path)
         
@@ -331,6 +338,13 @@ class Trainer:
         # Restore history if available
         self.train_history = checkpoint.get('train_history', [])
         self.val_history = checkpoint.get('val_history', [])
+        
+        # Check for data loader states
+        train_data_state = checkpoint.get('train_data_state', None)
+        val_data_state = checkpoint.get('val_data_state', None)
+        
+        if train_data_state:
+            print(f"  ✓ Found progressive data state (train consumed: {train_data_state.get('tokens_consumed', 0):,} tokens)")
         
         print(f"✓ Checkpoint loaded successfully!")
         print(f"  Resuming from step: {self.global_step}")
@@ -404,7 +418,7 @@ def main():
     parser.add_argument('--resume', type=str, default=None, 
                         help='Path to checkpoint to resume from (e.g., checkpoints/best_model.pt)')
     parser.add_argument('--config', type=str, default='rtx4090',
-                        choices=['small', 'medium', 'large', 'xlarge', 'rtx4090', 'h100', 'h100_1k', 'b200'],
+                        choices=['small', 'medium', 'large', 'xlarge', 'rtx4090', 'h100', 'h100_1k', 'h100_5k', 'b200'],
                         help='Model configuration size')
     parser.add_argument('--extend-steps', type=int, default=None,
                         help='Extend training to this many total steps (useful when resuming)')
@@ -423,6 +437,7 @@ def main():
         'rtx4090': get_rtx4090_optimized_config,
         'h100': get_h100_optimized_config,
         'h100_1k': get_h100_1k_checkpoint_config,
+        'h100_5k': get_h100_5k_config,
         'b200': get_b200_optimized_config,
     }
     config = config_map[args.config]()
@@ -473,8 +488,7 @@ def main():
     print(f"Vocabulary size: {config.vocab_size}")
     print(f"Total tokens: {len(tokens):,}")
     
-    # Split tokens BEFORE creating overlapping windows to prevent data leakage
-    # This ensures train and val sets have completely different text
+    # Split tokens BEFORE creating windows to prevent data leakage
     val_split_ratio = 0.1
     val_token_start = int(len(tokens) * (1 - val_split_ratio))
     
@@ -484,29 +498,35 @@ def main():
     print(f"Train tokens: {len(train_tokens):,}")
     print(f"Val tokens: {len(val_tokens):,}")
     
-    # Create datasets with non-overlapping token sequences
-    train_dataset = TextTokenDataset(train_tokens, config.max_seq_len)
-    val_dataset = TextTokenDataset(val_tokens, config.max_seq_len)
+    # Check if we need to resume from a data state
+    train_data_state = None
+    val_data_state = None
     
-    train_loader = DataLoader(
-        train_dataset, 
-        batch_size=config.batch_size, 
-        shuffle=True, 
-        num_workers=4,  # Parallel data loading
-        pin_memory=True,  # Faster CPU->GPU transfer
-        persistent_workers=True if config.batch_size > 1 else False,
-    )
-    val_loader = DataLoader(
-        val_dataset, 
-        batch_size=config.batch_size, 
-        shuffle=False, 
-        num_workers=2,  # Fewer workers for validation
-        pin_memory=True,
+    if resume_checkpoint_path:
+        checkpoint_data = torch.load(resume_checkpoint_path, map_location='cpu', weights_only=False)
+        train_data_state = checkpoint_data.get('train_data_state', None)
+        val_data_state = checkpoint_data.get('val_data_state', None)
+        
+        if train_data_state:
+            print(f"\n🔄 PROGRESSIVE DATA LOADING:")
+            print(f"  Previous run consumed: {train_data_state['tokens_consumed']:,} tokens")
+            print(f"  Continuing from token position: {train_data_state['dataset_end_idx']:,}")
+            print(f"  ✅ NO DATA WILL BE REPEATED - always fresh data!")
+        else:
+            print(f"\n⚠️  No data state found - using standard data loader (will repeat data)")
+    
+    # Create progressive data loaders (never repeat data)
+    from data.streaming_dataset import create_progressive_loaders
+    
+    train_loader, val_loader = create_progressive_loaders(
+        train_tokens, val_tokens,
+        config.max_seq_len, config.batch_size,
+        train_data_state, val_data_state
     )
     
-    print(f"Train samples (windows): {len(train_dataset):,}")
-    print(f"Val samples (windows): {len(val_dataset):,}")
-    print(f"✓ Data split prevents leakage: train and val use different text")
+    print(f"Train windows available: {len(train_loader):,}")
+    print(f"Val windows available: {len(val_loader):,}")
+    print(f"✓ Progressive loading enabled - never repeats data across runs")
     
     # Create model
     print("\n" + "="*70)

@@ -226,6 +226,37 @@ def get_h100_1k_checkpoint_config():
     )
 
 
+def get_h100_5k_config():
+    """H100 config for 5000-step training"""
+    return ExperimentConfig(
+        # Model architecture
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        hidden_ratio=4,
+        
+        # Sequence and batch configuration
+        max_seq_len=1024,
+        batch_size=120,
+        
+        # Training params - 5k steps with proper warmup and decay
+        max_steps=5000,
+        warmup_steps=500,  # 10% warmup
+        learning_rate=1e-3,  # Best LR from ablation
+        gradient_clip=1.0,
+        
+        # Data
+        num_documents=2000,
+        max_tokens=5_000_000,
+        
+        # Evaluation settings
+        eval_interval=100,
+        eval_batches=20,
+        log_interval=25,
+        save_interval=500,
+    )
+
+
 def get_b200_optimized_config():
     """Optimized for NVIDIA B200 (190GB HBM3e) - same model as 4090, larger batch"""
     return ExperimentConfig(
