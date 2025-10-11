@@ -166,6 +166,40 @@ def get_rtx4090_optimized_config():
     )
 
 
+def get_h100_optimized_config():
+    """Optimized for NVIDIA H100 (80GB HBM3) - same model as 4090, larger batch"""
+    return ExperimentConfig(
+        # Same model architecture as 4090 for easy comparison
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        hidden_ratio=4,
+        
+        # Same sequence length as 4090
+        max_seq_len=1024,
+        
+        # Batch size tuned to ~95% memory utilization (batch_size=96 used 75.8%)
+        batch_size=120,  # Maximizes H100 80GB memory usage
+        
+        # Training params - scale learning rate with sqrt(batch_size_ratio)
+        # batch_ratio = 120/32 = 3.75, sqrt(3.75) ≈ 1.94
+        # 3e-4 * 1.94 ≈ 5.8e-4
+        max_steps=2000,
+        warmup_steps=200,
+        learning_rate=5.8e-4,  # Sqrt scaling: 3e-4 * sqrt(3.75)
+        gradient_clip=1.0,
+        
+        # Data - same as 4090
+        num_documents=2000,
+        max_tokens=5_000_000,
+        
+        # Evaluation settings
+        eval_interval=50,
+        eval_batches=20,
+        log_interval=10,
+    )
+
+
 def get_b200_optimized_config():
     """Optimized for NVIDIA B200 (190GB HBM3e) - same model as 4090, larger batch"""
     return ExperimentConfig(
