@@ -68,6 +68,72 @@ class ExperimentConfig:
             self.intermediate_size = self.hidden_size * self.hidden_ratio
 
 
+# Predefined configurations for different scales
+
+def get_small_config():
+    """Small config for quick testing (~2M params)"""
+    return ExperimentConfig(
+        hidden_size=128,
+        num_hidden_layers=4,
+        num_attention_heads=4,
+        hidden_ratio=2,
+        max_seq_len=128,
+        batch_size=2,
+        max_steps=1000,
+        warmup_steps=50,
+        num_documents=500,
+        max_tokens=500_000,
+    )
+
+
+def get_medium_config():
+    """Medium config - default (~15M params)"""
+    return ExperimentConfig(
+        hidden_size=256,
+        num_hidden_layers=8,
+        num_attention_heads=8,
+        hidden_ratio=4,
+        max_seq_len=256,
+        batch_size=4,
+        max_steps=2000,
+        warmup_steps=100,
+        num_documents=1000,
+        max_tokens=2_000_000,
+    )
+
+
+def get_large_config():
+    """Large config for full training (~60M params)"""
+    return ExperimentConfig(
+        hidden_size=512,
+        num_hidden_layers=12,
+        num_attention_heads=8,
+        hidden_ratio=4,
+        max_seq_len=512,
+        batch_size=8,
+        max_steps=5000,
+        warmup_steps=250,
+        num_documents=2000,
+        max_tokens=5_000_000,
+    )
+
+
+def get_xlarge_config():
+    """Extra large config (~200M params)"""
+    return ExperimentConfig(
+        hidden_size=1024,
+        num_hidden_layers=16,
+        num_attention_heads=16,
+        hidden_ratio=4,
+        max_seq_len=1024,
+        batch_size=4,
+        max_steps=10000,
+        warmup_steps=500,
+        num_documents=5000,
+        max_tokens=10_000_000,
+    )
+
+
 # Predefined configurations for specific GPUs
 
 def get_rtx4090_optimized_config():
