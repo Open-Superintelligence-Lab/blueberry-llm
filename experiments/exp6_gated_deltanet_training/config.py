@@ -167,36 +167,62 @@ def get_rtx4090_optimized_config():
 
 
 def get_h100_optimized_config():
-    """Optimized for NVIDIA H100 (80GB HBM3) - same model as 4090, larger batch"""
+    """Optimized for NVIDIA H100 (80GB HBM3) - tuned via LR ablation study"""
     return ExperimentConfig(
-        # Same model architecture as 4090 for easy comparison
+        # Model architecture - same as 4090 for comparison
         hidden_size=768,
         num_hidden_layers=12,
         num_attention_heads=12,
         hidden_ratio=4,
         
-        # Same sequence length as 4090
+        # Sequence and batch configuration
         max_seq_len=1024,
+        batch_size=120,  # Optimized for ~90% memory utilization on H100
         
-        # Batch size tuned to ~95% memory utilization (batch_size=96 used 75.8%)
-        batch_size=120,  # Maximizes H100 80GB memory usage
-        
-        # Training params - scale learning rate with sqrt(batch_size_ratio)
-        # batch_ratio = 120/32 = 3.75, sqrt(3.75) ≈ 1.94
-        # 3e-4 * 1.94 ≈ 5.8e-4
-        max_steps=2000,
-        warmup_steps=200,
-        learning_rate=5.8e-4,  # Sqrt scaling: 3e-4 * sqrt(3.75)
+        # Training params - LR from ablation study (tested 7 LRs, 1e-3 won)
+        max_steps=10000,  # Extended training for production
+        warmup_steps=1000,  # 10% warmup
+        learning_rate=1e-3,  # Best from ablation: val_loss=6.671
         gradient_clip=1.0,
         
-        # Data - same as 4090
+        # Data
         num_documents=2000,
         max_tokens=5_000_000,
         
         # Evaluation settings
-        eval_interval=50,
+        eval_interval=100,  # Eval every 100 steps
         eval_batches=20,
-        log_interval=10,
+        log_interval=25,  # More frequent logging for 10k steps
+    )
+
+
+def get_h100_1k_checkpoint_config():
+    """H100 config for 1000-step checkpoint (to be resumed later for full training)"""
+    return ExperimentConfig(
+        # Model architecture
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        hidden_ratio=4,
+        
+        # Sequence and batch configuration
+        max_seq_len=1024,
+        batch_size=120,
+        
+        # Training params - optimized for 1k checkpoint
+        max_steps=1000,  # Initial checkpoint run
+        warmup_steps=100,  # Quick warmup (10%)
+        learning_rate=1e-3,  # Best LR from ablation
+        gradient_clip=1.0,
+        
+        # Data
+        num_documents=2000,
+        max_tokens=5_000_000,
+        
+        # Evaluation settings
+        eval_interval=100,
+        eval_batches=20,
+        log_interval=50,
     )
 
 

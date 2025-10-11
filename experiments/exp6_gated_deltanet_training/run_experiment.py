@@ -42,6 +42,7 @@ from experiments.exp6_gated_deltanet_training.config import (
     get_xlarge_config,
     get_rtx4090_optimized_config,
     get_h100_optimized_config,
+    get_h100_1k_checkpoint_config,
     get_b200_optimized_config,
 )
 from experiments.exp6_gated_deltanet_training.models import (
@@ -403,7 +404,7 @@ def main():
     parser.add_argument('--resume', type=str, default=None, 
                         help='Path to checkpoint to resume from (e.g., checkpoints/best_model.pt)')
     parser.add_argument('--config', type=str, default='rtx4090',
-                        choices=['small', 'medium', 'large', 'xlarge', 'rtx4090', 'h100', 'b200'],
+                        choices=['small', 'medium', 'large', 'xlarge', 'rtx4090', 'h100', 'h100_1k', 'b200'],
                         help='Model configuration size')
     parser.add_argument('--extend-steps', type=int, default=None,
                         help='Extend training to this many total steps (useful when resuming)')
@@ -421,6 +422,7 @@ def main():
         'xlarge': get_xlarge_config,
         'rtx4090': get_rtx4090_optimized_config,
         'h100': get_h100_optimized_config,
+        'h100_1k': get_h100_1k_checkpoint_config,
         'b200': get_b200_optimized_config,
     }
     config = config_map[args.config]()

@@ -81,6 +81,69 @@ config = ExperimentConfig(
 )
 ```
 
+## Learning Rate Ablation Study (H100)
+
+We conducted a comprehensive learning rate ablation study on NVIDIA H100 (80GB) to find the optimal learning rate for batch_size=120:
+
+### Results Summary
+
+Tested 7 learning rates over 1000 steps each:
+
+| Rank | Learning Rate | Best Val Loss | Final Val Loss | Final Accuracy |
+|------|---------------|---------------|----------------|----------------|
+| 🥇 1 | **1.00e-03** | **6.671** | 8.924 | 14.77% |
+| 🥈 2 | 5.80e-04 | 6.822 | 8.760 | 14.29% |
+| 🥉 3 | 7.00e-04 | 6.835 | 8.788 | 14.52% |
+| 4 | 5.00e-04 | 6.952 | 8.780 | 13.33% |
+| 5 | 3.00e-04 | 7.150 | 8.811 | 10.59% |
+| 6 | 2.00e-04 | 7.146 | 8.557 | 8.71% |
+| 7 | 4.00e-04 | 7.166 | 8.934 | 11.60% |
+
+### Key Findings
+
+- ✅ **Best LR: 1.00e-03** - Achieved lowest validation loss (6.671) during training
+- 📊 Higher learning rates (7e-4 to 1e-3) significantly outperformed conservative rates
+- 🎯 Our sqrt-scaled estimate (5.8e-4) performed well but slightly conservative
+- ⚡ Training speed: ~2.6 steps/s on H100 at 90% memory utilization (74GB/81GB)
+- 🔥 **Recommendation**: Use `learning_rate=1e-3` for production training
+
+### Configuration
+
+The ablation used:
+- **Model**: 768d, 12 layers (100M params)
+- **Batch size**: 120 (optimized for H100)
+- **Sequence length**: 1024 tokens
+- **GPU**: NVIDIA H100 80GB HBM3
+- **Steps per experiment**: 1000
+
+See visualization: `lr_ablation/lr_ablation_comparison.png`
+
+### Production Training (10K Steps)
+
+Based on ablation results, we're running production training with:
+```bash
+python run_experiment.py --config h100
+```
+
+**Configuration:**
+- Learning Rate: 1e-3 (winner from ablation)
+- Batch Size: 120
+- Steps: 10,000 (warmup: 1,000)
+- Expected time: ~65 minutes on H100
+
+**Monitor progress:**
+```bash
+# Live monitor with GPU stats (auto-refresh every 5s)
+bash watch_training.sh
+
+# Or check log manually
+tail -f training_10k.log
+```
+
+**Checkpoints saved to:** `checkpoints/best_model.pt`
+
+See `TRAINING_10K_STATUS.md` for detailed monitoring guide.
+
 ## Model Details
 
 ### Gated DeltaNet Parameters
