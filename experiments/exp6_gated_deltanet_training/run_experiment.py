@@ -297,19 +297,33 @@ class Trainer:
         torch.serialization.add_safe_globals([ExperimentConfig])
         checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         
+        # Check if max_steps has changed (extended training)
+        old_config = checkpoint['config']
+        max_steps_changed = old_config.max_steps != self.config.max_steps
+        
         # Restore model
         self.model.load_state_dict(checkpoint['model_state_dict'])
         
         # Restore optimizer
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
-        # Restore scheduler
-        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-        
-        # Restore training state
+        # Restore training state first (needed for scheduler)
         self.global_step = checkpoint['global_step']
         self.epoch = checkpoint.get('epoch', 0)
         self.best_val_loss = checkpoint['best_val_loss']
+        
+        # Handle scheduler: recreate if max_steps changed, otherwise restore state
+        if max_steps_changed:
+            print(f"  ⚠ max_steps changed ({old_config.max_steps} → {self.config.max_steps})")
+            print(f"  Recreating LR scheduler with new schedule...")
+            self.scheduler = self._create_scheduler()
+            # Fast-forward scheduler to current step
+            for _ in range(self.global_step):
+                self.scheduler.step()
+            print(f"  ✓ Scheduler recreated and fast-forwarded to step {self.global_step}")
+        else:
+            # Normal resume: restore scheduler state
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         
         # Restore history if available
         self.train_history = checkpoint.get('train_history', [])
@@ -319,6 +333,7 @@ class Trainer:
         print(f"  Resuming from step: {self.global_step}")
         print(f"  Epoch: {self.epoch}")
         print(f"  Best val loss so far: {self.best_val_loss:.4f}")
+        print(f"  Current LR: {self.scheduler.get_last_lr()[0]:.6f}")
         print(f"  Training history entries: {len(self.train_history)}")
         print(f"  Validation history entries: {len(self.val_history)}")
         print(f"{'='*70}\n")
