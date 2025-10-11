@@ -159,27 +159,28 @@ def main():
     # Base config
     config = get_rtx4090_optimized_config()
     
-    # Quick 10-step test for sanity check
-    config.max_steps = 10
-    config.warmup_steps = 2
-    config.eval_interval = 5
-    config.log_interval = 2
-    config.save_interval = 10
+    # LR Ablation configuration - longer for better results
+    config.max_steps = 200
+    config.warmup_steps = 20  # 10% warmup
+    config.eval_interval = 40
+    config.log_interval = 10
+    config.save_interval = 200
     
     # Calculate tokens needed for no repetition:
     # RTX4090: batch_size=32, max_seq_len=1024
     # Tokens per step = 32 × 1024 = 32,768
-    # For 10 steps: 32,768 × 10 = 327,680 tokens (~0.33M)
-    # With 2x safety margin = 655,360 (~0.66M)
-    config.num_documents = 100
-    config.max_tokens = 700_000  # 0.7M tokens for 10 steps (2x margin)
+    # For 200 steps: 32,768 × 200 = 6,553,600 tokens (~6.6M)
+    # With 2x safety margin = 13,107,200 (~13.1M)
+    config.num_documents = 2_000
+    config.max_tokens = 15_000_000  # 15M tokens for 200 steps (2x margin)
     
     set_seed(config.seed)
     device = torch.device(config.device if torch.cuda.is_available() else 'cpu')
     
     print(f"\nDevice: {device}")
     print(f"Config: {config.hidden_size}d, {config.num_hidden_layers} layers, batch_size={config.batch_size}")
-    print(f"Ablation: {config.max_steps} steps per LR\n")
+    print(f"Ablation: {config.max_steps} steps per LR")
+    print(f"Data: {config.max_tokens:,} tokens (no repetition)\n")
     
     # Load data (once, reuse for all experiments)
     print("="*70)
@@ -228,13 +229,16 @@ def main():
     print(f"Train samples: {len(train_dataset):,}")
     print(f"Val samples: {len(val_dataset):,}")
     
-    # Define learning rates to test (reduced for quick 10-step test)
+    # Define learning rates to test - extended range with higher LRs
+    # Previous 10-step test showed 1e-3 was best, so test even higher
     base_lr = 3e-4  # Base LR for batch_size=32
     
     learning_rates = [
-        3e-4,    # Base LR
+        3e-4,    # Base LR (baseline)
         5e-4,    # Medium
-        1e-3,    # Higher
+        1e-3,    # Previous best from quick test
+        1.5e-3,  # Higher
+        2e-3,    # Even higher
     ]
     
     print(f"\n{'='*70}")
@@ -322,7 +326,7 @@ def main():
         ],
         'best_lr': best_lr,
         'best_val_loss': sorted_results[0]['best_val_loss'],
-        'recommendation': f"Quick 10-step test complete. Best LR: {best_lr:.2e}. Extend to 1000+ steps for full ablation."
+        'recommendation': f"200-step ablation complete. Best LR: {best_lr:.2e}. Use for 1000-step full training."
     }
     
     with open(results_dir / 'lr_ablation_summary.json', 'w') as f:
@@ -336,21 +340,15 @@ def main():
     print(f"\n{'='*70}")
     print("RECOMMENDATION FOR FULL TRAINING")
     print(f"{'='*70}")
-    print(f"\nThis was a quick 10-step sanity check. For full ablation, update config to:")
-    print(f"\n  # For 1000 steps (no data repetition):")
-    print(f"  config.max_steps = 1000")
-    print(f"  config.warmup_steps = 100")
-    print(f"  # Tokens needed: 32 batch × 1024 seq × 1000 steps = 32.8M")
-    print(f"  # With 2x safety margin = 65.5M tokens")
-    print(f"  config.num_documents = 10_000")
-    print(f"  config.max_tokens = 70_000_000  # 70M tokens")
-    print(f"\n  # For 2000 steps (no data repetition):")
-    print(f"  # Tokens needed: 32 × 1024 × 2000 = 65.5M")
-    print(f"  # With 2x safety margin = 131M tokens")
-    print(f"  config.max_tokens = 135_000_000  # 135M tokens")
-    print(f"\nBest LR from quick test: {best_lr:.2e}")
-    print(f"\nThen run:")
+    print(f"\n🎯 BEST LEARNING RATE from 200-step ablation: {best_lr:.2e}")
+    print(f"   Best Val Loss: {sorted_results[0]['best_val_loss']:.4f}")
+    print(f"\nThe RTX 4090 config is already set for 1000 steps with 70M tokens.")
+    print(f"Update the learning rate in config.py:")
+    print(f"\n  get_rtx4090_optimized_config():")
+    print(f"    learning_rate={best_lr:.2e}  # ← Update this")
+    print(f"\nThen run full training:")
     print(f"  python run_experiment.py --config rtx4090")
+    print(f"\nThis will train for 1000 steps with NO data repetition.")
     
     print(f"\n{'='*70}")
     print("Ablation study completed! ✨")
