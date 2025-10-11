@@ -467,14 +467,20 @@ def main():
     print(f"Vocabulary size: {config.vocab_size}")
     print(f"Total tokens: {len(tokens):,}")
     
-    # Create datasets
-    dataset = TextTokenDataset(tokens, config.max_seq_len)
-    val_size = len(dataset) // 10
-    train_size = len(dataset) - val_size
+    # Split tokens BEFORE creating overlapping windows to prevent data leakage
+    # This ensures train and val sets have completely different text
+    val_split_ratio = 0.1
+    val_token_start = int(len(tokens) * (1 - val_split_ratio))
     
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size], generator=torch.Generator().manual_seed(config.seed)
-    )
+    train_tokens = tokens[:val_token_start]
+    val_tokens = tokens[val_token_start:]
+    
+    print(f"Train tokens: {len(train_tokens):,}")
+    print(f"Val tokens: {len(val_tokens):,}")
+    
+    # Create datasets with non-overlapping token sequences
+    train_dataset = TextTokenDataset(train_tokens, config.max_seq_len)
+    val_dataset = TextTokenDataset(val_tokens, config.max_seq_len)
     
     train_loader = DataLoader(
         train_dataset, 
@@ -492,8 +498,9 @@ def main():
         pin_memory=True,
     )
     
-    print(f"Train samples: {len(train_dataset):,}")
-    print(f"Val samples: {len(val_dataset):,}")
+    print(f"Train samples (windows): {len(train_dataset):,}")
+    print(f"Val samples (windows): {len(val_dataset):,}")
+    print(f"✓ Data split prevents leakage: train and val use different text")
     
     # Create model
     print("\n" + "="*70)

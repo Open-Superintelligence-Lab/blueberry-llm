@@ -68,60 +68,7 @@ class ExperimentConfig:
             self.intermediate_size = self.hidden_size * self.hidden_ratio
 
 
-# Predefined configurations
-
-def get_small_config():
-    """Small model for quick testing (~2M parameters)"""
-    return ExperimentConfig(
-        hidden_size=128,
-        num_hidden_layers=4,
-        num_attention_heads=4,
-        hidden_ratio=4,
-        max_seq_len=128,
-        batch_size=2,
-        max_steps=1000,
-    )
-
-
-def get_medium_config():
-    """Medium model - default (~15M parameters)"""
-    return ExperimentConfig(
-        hidden_size=256,
-        num_hidden_layers=8,
-        num_attention_heads=8,
-        hidden_ratio=4,
-        max_seq_len=256,
-        batch_size=4,
-        max_steps=2000,
-    )
-
-
-def get_large_config():
-    """Large model for full training (~60M parameters)"""
-    return ExperimentConfig(
-        hidden_size=512,
-        num_hidden_layers=12,
-        num_attention_heads=16,
-        hidden_ratio=4,
-        max_seq_len=512,
-        batch_size=8,
-        max_steps=5000,
-    )
-
-
-def get_xlarge_config():
-    """Extra large model (~200M parameters)"""
-    return ExperimentConfig(
-        hidden_size=1024,
-        num_hidden_layers=16,
-        num_attention_heads=16,
-        hidden_ratio=4,
-        max_seq_len=1024,
-        batch_size=4,
-        max_steps=10000,
-        learning_rate=2e-4,  # Lower LR for larger model
-    )
-
+# Predefined configurations for specific GPUs
 
 def get_rtx4090_optimized_config():
     """Optimized for RTX 4090 (24GB VRAM) - maximize GPU utilization"""
@@ -147,6 +94,39 @@ def get_rtx4090_optimized_config():
         max_tokens=5_000_000,
         
         # More frequent evaluation since steps are more expensive
+        eval_interval=50,
+        eval_batches=20,
+        log_interval=10,
+    )
+
+
+def get_b200_optimized_config():
+    """Optimized for NVIDIA B200 (190GB HBM3e) - same model as 4090, larger batch"""
+    return ExperimentConfig(
+        # Same model architecture as 4090 for easy comparison
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        hidden_ratio=4,
+        
+        # Same sequence length as 4090
+        max_seq_len=1024,
+        
+        # 8x larger batch size to utilize ~8x more memory (190GB vs 24GB)
+        batch_size=256,  # 8x the 4090's batch size
+        
+        # Training params - scale learning rate with sqrt(batch_size_ratio)
+        # 3e-4 * sqrt(8) ≈ 8.5e-4
+        max_steps=2000,
+        warmup_steps=200,
+        learning_rate=8.5e-4,  # Sqrt scaling: 3e-4 * sqrt(8)
+        gradient_clip=1.0,
+        
+        # Data - same as 4090
+        num_documents=2000,
+        max_tokens=5_000_000,
+        
+        # Evaluation settings
         eval_interval=50,
         eval_batches=20,
         log_interval=10,
