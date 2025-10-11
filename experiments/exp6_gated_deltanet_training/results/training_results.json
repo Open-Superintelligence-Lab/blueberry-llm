@@ -1,0 +1,132 @@
+{
+  "config": {
+    "hidden_size": 768,
+    "num_layers": 12,
+    "num_heads": 12,
+    "max_seq_len": 1024,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "max_steps": 1000
+  },
+  "model_info": {
+    "parameters": {
+      "total": 188984832,
+      "trainable": 188984832,
+      "total_millions": 188.984832,
+      "trainable_millions": 188.984832
+    },
+    "architecture": {
+      "verification_passed": true,
+      "model_type": "DeltaNetForCausalLM",
+      "is_deltanet": true,
+      "num_layers": 12,
+      "expected_num_layers": 12,
+      "layers_match": true,
+      "all_layers_valid": true,
+      "layer_types": [
+        {
+          "idx": 0,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 1,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 2,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 3,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 4,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 5,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 6,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 7,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 8,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 9,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 10,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        },
+        {
+          "idx": 11,
+          "type": "DeltaNetBlock",
+          "has_attn": true,
+          "has_mlp": true,
+          "valid": true
+        }
+      ]
+    },
+    "config": {
+      "hidden_size": 768,
+      "num_layers": 12,
+      "num_heads": 12,
+      "max_seq_len": 2048,
+      "vocab_size": 49152
+    }
+  },
+  "results": {
+    "total_time": 432.5719563961029,
+    "best_val_loss": 4.252543032738859,
+    "final_train_loss": 2.535521936416626,
+    "final_val_metrics": {
+      "step": 1000,
+      "loss": 4.361583924890746,
+      "accuracy": 0.312006349310368,
+      "perplexity": 78.38117218017578
+    }
+  }
+}
