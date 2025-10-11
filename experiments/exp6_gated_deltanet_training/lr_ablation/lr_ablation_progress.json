@@ -1,0 +1,21 @@
+{
+  "completed_experiments": 3,
+  "total_experiments": 3,
+  "results_so_far": [
+    {
+      "lr": 0.0003,
+      "best_val_loss": 10.731694464809385,
+      "final_val_loss": 10.731694464809385
+    },
+    {
+      "lr": 0.0005,
+      "best_val_loss": 9.98010695411779,
+      "final_val_loss": 9.98010695411779
+    },
+    {
+      "lr": 0.001,
+      "best_val_loss": 8.70264578751222,
+      "final_val_loss": 8.70264578751222
+    }
+  ]
+}

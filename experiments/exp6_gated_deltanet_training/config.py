@@ -137,7 +137,7 @@ def get_xlarge_config():
 # Predefined configurations for specific GPUs
 
 def get_rtx4090_optimized_config():
-    """Optimized for RTX 4090 (24GB VRAM) - maximize GPU utilization"""
+    """Optimized for RTX 4090 (24GB VRAM) - 1000 steps with no data repetition"""
     return ExperimentConfig(
         # Larger model to use more GPU
         hidden_size=768,
@@ -146,20 +146,22 @@ def get_rtx4090_optimized_config():
         hidden_ratio=4,
         
         # Longer sequences and large batch for GPU saturation
-        max_seq_len=1024,  # 4x longer than default
-        batch_size=32,     # 8x larger than default!
+        max_seq_len=1024,
+        batch_size=32,
         
-        # Training params
-        max_steps=2000,
-        warmup_steps=200,
-        learning_rate=3e-4,
+        # Training params - 1000 steps
+        max_steps=1000,
+        warmup_steps=100,  # 10% warmup
+        learning_rate=3e-4,  # Will be updated after LR ablation
         gradient_clip=1.0,
         
-        # Data - more tokens for better training
-        num_documents=2000,
-        max_tokens=5_000_000,
+        # Data - NO REPETITION for 1000 steps
+        # Tokens needed: 32 batch × 1024 seq × 1000 steps = 32,768,000 (32.8M)
+        # With 2x safety margin = 65,536,000 (65.5M)
+        num_documents=10_000,
+        max_tokens=70_000_000,  # 70M tokens (2x safety margin)
         
-        # More frequent evaluation since steps are more expensive
+        # Evaluation settings
         eval_interval=50,
         eval_batches=20,
         log_interval=10,

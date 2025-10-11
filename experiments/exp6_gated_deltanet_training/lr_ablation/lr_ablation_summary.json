@@ -1,0 +1,40 @@
+{
+  "config": {
+    "hidden_size": 768,
+    "num_layers": 12,
+    "batch_size": 32,
+    "max_seq_len": 1024,
+    "ablation_steps": 10
+  },
+  "learning_rates_tested": [
+    0.0003,
+    0.0005,
+    0.001
+  ],
+  "results": [
+    {
+      "lr": 0.0003,
+      "best_val_loss": 10.731694464809385,
+      "final_val_loss": 10.731694464809385,
+      "final_val_accuracy": 0.0033235581622678397,
+      "elapsed_time": 150.44087743759155
+    },
+    {
+      "lr": 0.0005,
+      "best_val_loss": 9.98010695411779,
+      "final_val_loss": 9.98010695411779,
+      "final_val_accuracy": 0.04711632453567938,
+      "elapsed_time": 7.637354373931885
+    },
+    {
+      "lr": 0.001,
+      "best_val_loss": 8.70264578751222,
+      "final_val_loss": 8.70264578751222,
+      "final_val_accuracy": 0.055522971652003913,
+      "elapsed_time": 7.6811769008636475
+    }
+  ],
+  "best_lr": 0.001,
+  "best_val_loss": 8.70264578751222,
+  "recommendation": "Quick 10-step test complete. Best LR: 1.00e-03. Extend to 1000+ steps for full ablation."
+}
