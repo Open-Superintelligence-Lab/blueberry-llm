@@ -14,6 +14,7 @@ root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.insert(0, root_dir)
 
 from experiments.exp6_gated_deltanet_training.models import GatedDeltaNetWrapper
+from experiments.exp6_gated_deltanet_training.config import ExperimentConfig
 from transformers import AutoTokenizer
 
 
@@ -31,8 +32,9 @@ def load_model(checkpoint_path, device='cuda'):
     """
     print(f"Loading checkpoint from: {checkpoint_path}")
     
-    # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    # Load checkpoint (allowlist ExperimentConfig for PyTorch 2.6+ safety)
+    torch.serialization.add_safe_globals([ExperimentConfig])
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Get config
     config = checkpoint['config']

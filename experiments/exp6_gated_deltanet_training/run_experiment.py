@@ -9,6 +9,7 @@ import sys
 import os
 import time
 import json
+import argparse
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
@@ -25,6 +26,7 @@ from experiments.exp6_gated_deltanet_training.config import (
     get_small_config,
     get_medium_config,
     get_large_config,
+    get_xlarge_config,
     get_rtx4090_optimized_config,
 )
 from experiments.exp6_gated_deltanet_training.models import (
@@ -218,6 +220,11 @@ class Trainer:
                         self.best_val_loss = val_metrics['loss']
                         self.save_checkpoint('best_model.pt', is_best=True)
                         print(f"✓ New best validation loss: {self.best_val_loss:.4f} (saved)")
+                
+                # Periodic checkpoint saving
+                if self.global_step % self.config.save_interval == 0:
+                    checkpoint_path = self.save_checkpoint(f'checkpoint_step_{self.global_step}.pt', is_best=False)
+                    print(f"💾 Checkpoint saved at step {self.global_step}: {checkpoint_path}")
             
             self.epoch += 1
         
@@ -244,17 +251,20 @@ class Trainer:
         }
     
     def save_checkpoint(self, filename, is_best=False):
-        """Save model checkpoint for inference"""
+        """Save model checkpoint for training resumption"""
         checkpoint_path = self.save_dir / filename
         
-        # Save complete checkpoint
+        # Save complete checkpoint including training history
         checkpoint = {
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict(),
             'global_step': self.global_step,
+            'epoch': self.epoch,
             'best_val_loss': self.best_val_loss,
             'config': self.config,
+            'train_history': self.train_history,
+            'val_history': self.val_history,
         }
         
         torch.save(checkpoint, checkpoint_path)
@@ -263,6 +273,44 @@ class Trainer:
             self.best_checkpoint_path = checkpoint_path
         
         return checkpoint_path
+    
+    def load_checkpoint(self, checkpoint_path):
+        """Load checkpoint and restore training state"""
+        print(f"\n{'='*70}")
+        print(f"Resuming from checkpoint: {checkpoint_path}")
+        print(f"{'='*70}")
+        
+        # Load checkpoint (allowlist ExperimentConfig for PyTorch 2.6+ safety)
+        torch.serialization.add_safe_globals([ExperimentConfig])
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+        
+        # Restore model
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        
+        # Restore optimizer
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        # Restore scheduler
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        
+        # Restore training state
+        self.global_step = checkpoint['global_step']
+        self.epoch = checkpoint.get('epoch', 0)
+        self.best_val_loss = checkpoint['best_val_loss']
+        
+        # Restore history if available
+        self.train_history = checkpoint.get('train_history', [])
+        self.val_history = checkpoint.get('val_history', [])
+        
+        print(f"✓ Checkpoint loaded successfully!")
+        print(f"  Resuming from step: {self.global_step}")
+        print(f"  Epoch: {self.epoch}")
+        print(f"  Best val loss so far: {self.best_val_loss:.4f}")
+        print(f"  Training history entries: {len(self.train_history)}")
+        print(f"  Validation history entries: {len(self.val_history)}")
+        print(f"{'='*70}\n")
+        
+        return checkpoint
 
 
 def plot_training_curves(train_history, val_history, save_path):
@@ -320,18 +368,54 @@ def plot_training_curves(train_history, val_history, save_path):
 
 def main():
     """Main experiment function"""
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Train Gated DeltaNet model')
+    parser.add_argument('--resume', type=str, default=None, 
+                        help='Path to checkpoint to resume from (e.g., checkpoints/best_model.pt)')
+    parser.add_argument('--config', type=str, default='rtx4090',
+                        choices=['small', 'medium', 'large', 'xlarge', 'rtx4090'],
+                        help='Model configuration size')
+    parser.add_argument('--extend-steps', type=int, default=None,
+                        help='Extend training to this many total steps (useful when resuming)')
+    args = parser.parse_args()
+    
     print("="*70)
     print("EXPERIMENT 6: Gated DeltaNet Training with FLA")
     print("="*70)
     
-    # Configuration - choose one
-    # config = get_small_config()  # For quick testing (~2M params, batch=2)
-    # config = get_medium_config()  # Default (~15M params, batch=4)
-    # config = get_large_config()  # For full training (~60M params, batch=8)
-    config = get_rtx4090_optimized_config()  # 🚀 RTX 4090 optimized (~100M params, batch=32)
+    # Select configuration based on argument
+    config_map = {
+        'small': get_small_config,
+        'medium': get_medium_config,
+        'large': get_large_config,
+        'xlarge': get_xlarge_config,
+        'rtx4090': get_rtx4090_optimized_config,
+    }
+    config = config_map[args.config]()
     
     set_seed(config.seed)
     device = torch.device(config.device if torch.cuda.is_available() else 'cpu')
+    
+    # If resuming from checkpoint, load config from checkpoint
+    resume_checkpoint_path = None
+    if args.resume:
+        resume_checkpoint_path = Path(args.resume)
+        if not resume_checkpoint_path.exists():
+            print(f"\n❌ Error: Checkpoint not found: {resume_checkpoint_path}")
+            return
+        
+        # Load config from checkpoint
+        print(f"\nLoading config from checkpoint: {resume_checkpoint_path}")
+        torch.serialization.add_safe_globals([ExperimentConfig])
+        checkpoint_data = torch.load(resume_checkpoint_path, map_location='cpu', weights_only=False)
+        config = checkpoint_data['config']
+        print(f"✓ Config loaded from checkpoint")
+    
+    # Extend training steps if requested
+    if args.extend_steps:
+        original_max_steps = config.max_steps
+        config.max_steps = args.extend_steps
+        print(f"\n📈 Extending training: {original_max_steps} → {args.extend_steps} steps")
     
     print(f"\nUsing device: {device}")
     print(f"Configuration: {config.hidden_size}d, {config.num_hidden_layers} layers")
@@ -412,6 +496,11 @@ def main():
     checkpoints_dir = Path(__file__).parent / "checkpoints"
     
     trainer = Trainer(model, config, train_loader, val_loader, device, save_dir=checkpoints_dir)
+    
+    # Load checkpoint if resuming
+    if resume_checkpoint_path:
+        trainer.load_checkpoint(resume_checkpoint_path)
+    
     results = trainer.train()
     
     # Save results
