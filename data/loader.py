@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from itertools import chain
+import numpy as np
+from numpy.lib.stride_tricks import as_strided
 from typing import Optional, Union, Tuple
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer
@@ -104,29 +105,38 @@ def tokenize_and_chunk(
     
     # note: implicit closure over stride
     def group_texts(examples):
-        concatenated = {
-            k: list(chain.from_iterable(examples[k]))
-            for k in examples.keys()
-        }
-        total_length = len(concatenated["input_ids"])
-
-        # warn if the total text is too short
-        if total_length < block_size:
+        
+        # concat all sequences in this batch into single arrays per key
+        arrays = {k: np.concatenate(examples[k]) for k in examples.keys()}
+        total = arrays["input_ids"].shape[0]
+        
+        # batch didn't have enough tokens for even one block
+        if total < block_size:
             logger.warning(
-                f"Concatenated text length ({total_length}) is smaller than "
-                f"block_size ({block_size}). No samples will be generated from this batch."
+                f"Batch only has {total} tokens but block_size is {block_size}. "
+                f"Skipping this batch."
             )
-            return {k: [] for k in concatenated.keys()}
-
-        # drop the small remainder, could also pad if needed
-        total_length = (total_length // block_size) * block_size
-
-        # split by chunks of block_size w.r.t stride
-        result = {
-            k: [t[i : i + block_size] for i in range(0, total_length - block_size + 1, stride)]
-            for k, t in concatenated.items()
+            return {k: np.empty((0, block_size), dtype=arrays[k].dtype) for k in arrays.keys()}
+        
+        # drop partial block at the end could pad if needed
+        trunc = (total // block_size) * block_size
+        
+        if stride == block_size:
+            # fast path: non-overlapping windows via reshape (zero-copy, O(1))
+            n = trunc // block_size
+            return {k: v[:trunc].reshape(n, block_size) for k, v in arrays.items()}
+        
+        # overlapping windows: use strided views (also zero-copy)
+        # this creates sliding windows w/o allocating new memory
+        n_windows = (trunc - block_size) // stride + 1
+        return {
+            k: as_strided(
+                v, 
+                shape=(n_windows, block_size), 
+                strides=(stride * v.strides[0], v.strides[0])
+            )
+            for k, v in arrays.items()
         }
-        return result
 
     logger.info(f"Grouping texts into blocks of size {block_size} with stride {stride}")
     lm_dataset = tokenized.map(
