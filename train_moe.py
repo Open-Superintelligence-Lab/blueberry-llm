@@ -4,11 +4,11 @@ import logging
 from torch.utils.data import DataLoader
 
 from configs.moe_config import MoEModelConfig
-from data.config import DataConfig
+from configs.dataset_config import DataConfig
 from data.loader import prepare_lm_dataset
 from training.trainer import train_moe_model
 from utils.helpers import set_seed
-from utils.logging_config import setup_logging
+from utils.logger import setup_logging
 
 
 def print_system_info():
@@ -35,7 +35,6 @@ def main():
         tokenizer_name="HuggingFaceTB/SmolLM-135M",
         seq_length=config.max_seq_len,
         num_samples=config.num_documents,
-        max_tokens=config.max_tokens,
         cache_dir="./hf_cache",
     )
 
