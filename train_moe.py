@@ -1,69 +1,95 @@
-import torch
 import time
+import torch
+import logging
 from torch.utils.data import DataLoader
+
 from configs.moe_config import MoEModelConfig
-from data.loader import load_and_cache_data
-from data.dataset import TextTokenDataset
+from data.config import DataConfig
+from data.loader import prepare_lm_dataset
 from training.trainer import train_moe_model
 from utils.helpers import set_seed
+from utils.logging_config import setup_logging
+
+
+def print_system_info():
+    device = "CUDA" if torch.cuda.is_available() else "CPU"
+    print(f"Device: {device}")
+    if torch.cuda.is_available():
+        props = torch.cuda.get_device_properties(0)
+        print(f"GPU: {props.name} ({props.total_memory / 1e9:.1f} GB)")
+    print(f"PyTorch: {torch.__version__}\n")
 
 
 def main():
-    """Main training script for MoE model"""
-    # Check system
-    print(f"🔍 Device: {'CUDA' if torch.cuda.is_available() else 'CPU'}")
-    if torch.cuda.is_available():
-        print(f"GPU: {torch.cuda.get_device_name()}")
-        print(f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    logger = setup_logging(log_dir="./logs")
+    logger.info("Starting MoE training")
 
-    # Set seed
+    print_system_info()
     set_seed(42)
+    config = MoEModelConfig()
 
-    # Load data first to get vocab_size
-    temp_config = MoEModelConfig()  # Use MoE config for data loading
-    texts, tokenizer, tokens = load_and_cache_data(temp_config)
-    vocab_size = temp_config.vocab_size
-
-    # Use MoE config and set vocab_size
-    config = MoEModelConfig(vocab_size=vocab_size)
-
-    dataset = TextTokenDataset(tokens, config.max_seq_len)
-
-    # Train/val split
-    val_size = len(dataset) // 10
-    train_size = len(dataset) - val_size
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42)
+    print("Loading dataset with Hugging Face Datasets API...")
+    data_cfg = DataConfig(
+        dataset_path="HuggingFaceTB/smollm-corpus",
+        dataset_name="cosmopedia-v2",
+        tokenizer_name="HuggingFaceTB/SmolLM-135M",
+        seq_length=config.max_seq_len,
+        num_samples=config.num_documents,
+        max_tokens=config.max_tokens,
+        cache_dir="./hf_cache",
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=2)
+    dataset, tokenizer = prepare_lm_dataset(data_cfg)
+    config.vocab_size = tokenizer.vocab_size
+    logger.info(f"Loaded dataset with {len(dataset):,} sequences")
 
-    print(f"📊 Dataset: {len(train_dataset)} train, {len(val_dataset)} val samples")
+    splits = dataset.train_test_split(test_size=0.1, seed=42)
+    train_ds, val_ds = splits["train"], splits["test"]
+    logger.info(f"Train sequences: {len(train_ds):,}, Val sequences: {len(val_ds):,}")
 
-    # Train MoE model
-    print(f"\n{'='*60}")
-    print(f"🧪 TRAINING: Mixture of Experts Model")
-    print(f"{'='*60}")
+    loader_args = dict(
+        batch_size=config.batch_size,
+        num_workers=2,
+        pin_memory=torch.cuda.is_available(),
+        persistent_workers=True,
+    )
+    train_loader = DataLoader(train_ds, shuffle=True, **loader_args)
+    val_loader = DataLoader(val_ds, shuffle=False, **loader_args)
 
-    print(f"\n📋 MoE Model Configuration:")
-    print(f"   Architecture: {config.d_model}d, {config.n_layers}L, {config.n_heads}H, {config.d_ff}ff")
-    print(f"   MoE: {config.num_experts} experts, top-{config.expert_top_k} routing")
-    print(f"   Training: {config.max_steps} steps, batch size {config.batch_size}")
-    print(f"   Data: {config.max_tokens:,} tokens, seq_len {config.max_seq_len}")
+    print("\nModel configuration")
+    print("-" * 70)
+    print(f"d_model: {config.d_model}, layers: {config.n_layers}, heads: {config.n_heads}")
+    print(f"ff dim: {config.d_ff}")
+    print(f"experts: {config.num_experts}, top‑k: {config.expert_top_k}")
+    print(f"steps: {config.max_steps}, batch size: {config.batch_size}")
+    print(f"vocab size: {config.vocab_size}\n")
+    logger.info(f"Model configuration: {vars(config)}")
 
-    # Train model
-    start_time = time.time()
-    model, final_metrics = train_moe_model(config, train_loader, val_loader)
-    total_time = time.time() - start_time
+    print("Starting training...")
+    print("-" * 70)
+    start = time.time()
 
-    print(f"\n🎯 MoE Model Results:")
-    print(f"⏱️ Training time: {total_time/60:.1f} minutes")
-    print(f"🏆 Final Results:")
-    print(f"   Validation Loss: {final_metrics['val_loss']:.4f}")
-    print(f"   Validation Accuracy: {final_metrics['val_accuracy']:.4f}")
-    print(f"   Validation Perplexity: {final_metrics['val_perplexity']:.2f}")
-    print(f"{'='*60}")
+    model, metrics = train_moe_model(config, train_loader, val_loader)
+    elapsed = (time.time() - start) / 60
+    logger.info("Training complete")
+
+    print("\nResults")
+    print("-" * 70)
+    print(f"Training time: {elapsed:.2f} min")
+    print(f"Val loss:       {metrics['val_loss']:.4f}")
+    print(f"Val accuracy:   {metrics['val_accuracy']:.4f}")
+    print(f"Val perplexity: {metrics['val_perplexity']:.2f}")
+    logger.info(f"Final metrics: {metrics}")
+
+    ckpt_path = "./checkpoints/final_model.pt"
+    torch.save(
+        {"model_state_dict": model.state_dict(),
+         "config": config,
+         "metrics": metrics},
+        ckpt_path,
+    )
+    print(f"Model checkpoint saved to {ckpt_path}")
+    logger.info(f"Model saved to {ckpt_path}")
 
 
 if __name__ == "__main__":

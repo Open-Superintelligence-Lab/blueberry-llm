@@ -1,88 +1,218 @@
-import torch
-from torch.utils.data import Dataset
-from typing import List
-import os
-import pickle
-from datasets import load_dataset
-from tqdm import tqdm
-from transformers import AutoTokenizer
-from configs.moe_config import MoEModelConfig
+from __future__ import annotations
+
+from itertools import chain
+from typing import Optional, Union, Tuple
+from datasets import load_dataset, Dataset
+from transformers import AutoTokenizer, PreTrainedTokenizer
+from configs.dataset_config import DataConfig
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class TextTokenDataset(Dataset):
-    def __init__(self, tokens: List[int], seq_len: int = 512, window_indices: List[int] = None):
-        self.tokens = tokens
-        self.seq_len = seq_len
-        # If window_indices is provided, use those specific windows
-        # Otherwise, use all possible windows (original behavior)
-        if window_indices is not None:
-            self.window_indices = window_indices
-        else:
-            self.window_indices = list(range(max(0, len(tokens) - seq_len)))
-
-    def __len__(self):
-        return len(self.window_indices)
-
-    def __getitem__(self, idx):
-        # Get the actual window start position
-        window_start = self.window_indices[idx]
-        x = torch.tensor(self.tokens[window_start:window_start + self.seq_len], dtype=torch.long)
-        y = torch.tensor(self.tokens[window_start + 1:window_start + self.seq_len + 1], dtype=torch.long)
-        return x, y
-
-
-def load_and_cache_data(config: MoEModelConfig, cache_dir: str = "data_cache"):
-    """Load and cache tokenized data to avoid reprocessing"""
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f"{cache_dir}/tokenized_data_{config.num_documents}_{config.max_tokens}.pkl"
-
-    # Check if cached data exists
-    if os.path.exists(cache_file):
-        print(f"📦 Loading cached data from {cache_file}")
-        with open(cache_file, 'rb') as f:
-            cached_data = pickle.load(f)
-
-        texts = cached_data['texts']
-        tokenizer = cached_data['tokenizer']
-        tokens = cached_data['tokens']
-        config.vocab_size = tokenizer.vocab_size
-
-        print(f"✅ Loaded {len(texts)} documents, {len(tokens):,} tokens from cache")
-        return texts, tokenizer, tokens
-
-    print(f"🔄 Processing new data (will cache for future use)")
-
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM-135M", token=False)
+def setup_tokenizer(config: DataConfig) -> PreTrainedTokenizer:
+    logger.info(f"Loading tokenizer: {config.tokenizer_name}")
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.tokenizer_name,
+        use_fast=config.use_fast,
+        trust_remote_code=config.trust_remote_code,
+        cache_dir=config.cache_dir,
+    )
+    
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+        logger.info(f"Set pad_token to eos_token: {tokenizer.pad_token}")
+    
+    return tokenizer
 
-    # Load dataset
-    dataset = load_dataset("HuggingFaceTB/smollm-corpus", "cosmopedia-v2", split="train", streaming=True, token=False)
 
-    texts = []
-    for i, item in enumerate(dataset):
-        if i >= config.num_documents:
-            break
-        texts.append(item["text"][:3000])
+def load_raw_dataset(config: DataConfig) -> Dataset:
+    if config.load_from_disk:
+        logger.info(f"Loading preprocessed dataset from {config.load_from_disk}")
+        dataset = Dataset.load_from_disk(config.load_from_disk)
+        logger.info(f"Loaded {len(dataset)} sequences of length {config.seq_length}")
+        return dataset
+    
+    logger.info(f"Loading dataset '{config.dataset_path}' with name '{config.dataset_name}'")
+    dataset = load_dataset(
+        config.dataset_path,
+        config.dataset_name,
+        split=config.split,
+        cache_dir=config.cache_dir,
+    )
+    
+    if config.text_column not in dataset.column_names:
+        raise ValueError(
+            f"Text column '{config.text_column}' not found in dataset. "
+            f"Available columns: {dataset.column_names}"
+        )
+    
+    return dataset
 
-    print(f"Loaded {len(texts)} documents")
 
-    # Tokenize
-    print("Tokenizing texts...")
-    all_tokens = []
-    for text in tqdm(texts, desc="Tokenizing"):
-        tokens = tokenizer.encode(text, add_special_tokens=False)
-        all_tokens.extend(tokens)
+def apply_sampling_and_filters(dataset: Dataset, config: DataConfig) -> Dataset:
+    # Sampling
+    if config.num_samples:
+        actual_num_samples = min(config.num_samples, len(dataset))
+        if actual_num_samples < config.num_samples:
+            logger.warning(
+                f"Requested {config.num_samples} samples, but only {actual_num_samples} "
+                f"are available in the split '{config.split}'."
+            )
+        dataset = dataset.select(range(actual_num_samples))
+    
+    # Preprocessing
+    if config.preprocessing_fn:
+        logger.info("Applying preprocessing function...")
+        dataset = dataset.map(config.preprocessing_fn, num_proc=config.num_proc)
+    
+    # Filtering
+    if config.filter_fn:
+        logger.info("Applying filter function...")
+        dataset = dataset.filter(config.filter_fn, num_proc=config.num_proc)
+    
+    return dataset
 
-    tokens = all_tokens[:config.max_tokens]
-    print(f"Using {len(tokens):,} tokens")
-    config.vocab_size = tokenizer.vocab_size
 
-    # Cache the processed data
-    cached_data = {'texts': texts, 'tokenizer': tokenizer, 'tokens': tokens}
-    with open(cache_file, 'wb') as f:
-        pickle.dump(cached_data, f)
+def tokenize_and_chunk(
+    dataset: Dataset,
+    tokenizer: PreTrainedTokenizer,
+    config: DataConfig
+) -> Dataset:
+    # Note: truncation=False is intentional. concat text -> fixed size blocks. 
+    # avoids tokens at the end of documents
+    def tokenize_function(examples):
+        return tokenizer(
+            examples[config.text_column],
+            add_special_tokens=True,
+            truncation=False,
+            padding=False,
+        )
+    
+    logger.info("Tokenizing dataset...")
+    tokenized = dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=dataset.column_names,
+        num_proc=config.num_proc,
+        desc="Tokenizing",
+    )
+    
+    # group into fixed len chunks w/ stride
+    block_size = config.seq_length
+    stride = config.stride if config.stride is not None else block_size
+    
+    # note: implicit closure over stride
+    def group_texts(examples):
+        concatenated = {
+            k: list(chain.from_iterable(examples[k]))
+            for k in examples.keys()
+        }
+        total_length = len(concatenated["input_ids"])
 
-    print(f"💾 Cached data to {cache_file}")
-    return texts, tokenizer, tokens
+        # warn if the total text is too short
+        if total_length < block_size:
+            logger.warning(
+                f"Concatenated text length ({total_length}) is smaller than "
+                f"block_size ({block_size}). No samples will be generated from this batch."
+            )
+            return {k: [] for k in concatenated.keys()}
+
+        # drop the small remainder, could also pad if needed
+        total_length = (total_length // block_size) * block_size
+
+        # split by chunks of block_size w.r.t stride
+        result = {
+            k: [t[i : i + block_size] for i in range(0, total_length - block_size + 1, stride)]
+            for k, t in concatenated.items()
+        }
+        return result
+
+    logger.info(f"Grouping texts into blocks of size {block_size} with stride {stride}")
+    lm_dataset = tokenized.map(
+        group_texts,
+        batched=True,
+        num_proc=config.num_proc,
+        desc="Grouping texts",
+    )
+    
+    if len(lm_dataset) == 0:
+        logger.warning("The resulting dataset is empty!")
+    
+    return lm_dataset
+
+
+def finalize_dataset(dataset: Dataset, config: DataConfig) -> Dataset:
+    # labels for causal LM
+    def create_labels(examples):
+        examples["labels"] = examples["input_ids"].copy()
+        return examples
+    
+    dataset = dataset.map(create_labels, batched=True)
+    
+    # set format for PyTorch
+    dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+    
+    if config.save_to_disk:
+        logger.info(f"Saving preprocessed dataset to {config.save_to_disk}")
+        dataset.save_to_disk(config.save_to_disk)
+    
+    return dataset
+
+
+def prepare_lm_dataset(
+    config: DataConfig,
+    return_tokenizer: bool = True,
+) -> Union[Tuple[Dataset, PreTrainedTokenizer], Dataset]:
+    
+    tokenizer = setup_tokenizer(config)
+    dataset = load_raw_dataset(config)
+    
+    if not config.load_from_disk:
+        dataset = apply_sampling_and_filters(dataset, config)
+        dataset = tokenize_and_chunk(dataset, tokenizer, config)
+        dataset = finalize_dataset(dataset, config)
+    
+    logger.info(f"Dataset prepared: {len(dataset)} sequences of length {config.seq_length}")
+    logger.info(f"Vocabulary size: {tokenizer.vocab_size}")
+    
+    return (dataset, tokenizer) if return_tokenizer else dataset
+
+
+# presets for common use cases
+def quick_dataset(
+    preset: str = "cosmopedia",
+    seq_length: int = 512,
+    num_samples: int = 10000,
+    **kwargs
+) -> Tuple[Dataset, PreTrainedTokenizer]:
+    
+    presets = {
+        "cosmopedia": DataConfig(
+            dataset_path="HuggingFaceTB/smollm-corpus",
+            dataset_name="cosmopedia-v2",
+            tokenizer_name="HuggingFaceTB/SmolLM-135M",
+            seq_length=seq_length,
+            num_samples=num_samples,
+            **kwargs
+        ),
+        "wikipedia": DataConfig(
+            dataset_path="wikipedia",
+            dataset_name="20220301.en",
+            seq_length=seq_length,
+            num_samples=num_samples,
+            **kwargs
+        ),
+        "wikitext": DataConfig(
+            dataset_path="wikitext",
+            dataset_name="wikitext-103-v1",
+            seq_length=seq_length,
+            num_samples=num_samples,
+            **kwargs
+        ),
+    }
+    
+    if preset not in presets:
+        raise ValueError(f"Unknown preset: {preset}. Choose from {list(presets.keys())}")
+    
+    return prepare_lm_dataset(presets[preset])
