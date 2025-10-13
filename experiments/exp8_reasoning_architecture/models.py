@@ -1,10 +1,9 @@
 """
 Reasoning Model Architecture
-Based on FLA's Gated DeltaNet with exp7's winning hybrid configuration
+Based on MoE (Mixture of Experts) LLM
 
-Uses the winning Hybrid Sparse 17% architecture:
-- Attention at layers [5, 11]
-- DeltaNet for remaining layers
+Uses MoE architecture with multiple expert networks for improved capacity
+and specialized processing.
 
 Optional: Wrap with recursive reasoning for iterative refinement
 """
@@ -12,9 +11,17 @@ Optional: Wrap with recursive reasoning for iterative refinement
 import torch
 import torch.nn as nn
 from typing import Optional
+import sys
+import os
 
-# Use FLA's Gated DeltaNet implementation (supports hybrid with attention)
-from fla.models import GatedDeltaNetConfig, GatedDeltaNetForCausalLM
+# Add project root to path for imports
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
+# Use MoE implementation
+from models.moe_llm import MoEMinimalLLM
+from configs.moe_config import MoEModelConfig
 
 # Import recursive reasoning wrapper
 from experiments.exp8_reasoning_architecture.recursive_reasoning import (
@@ -25,61 +32,37 @@ from experiments.exp8_reasoning_architecture.recursive_reasoning import (
 
 def create_reasoning_model(config):
     """
-    Create a reasoning model using FLA's Gated DeltaNet with hybrid attention
-    Based on exp7's winning Hybrid Sparse 17% architecture
+    Create a reasoning model using MoE (Mixture of Experts)
     
     Args:
         config: ExperimentConfig with model parameters
     
     Returns:
-        GatedDeltaNetForCausalLM model instance configured for reasoning
+        MoEMinimalLLM model instance configured for reasoning
     """
-    # Convert ExperimentConfig to GatedDeltaNetConfig
-    deltanet_config = GatedDeltaNetConfig(
+    # Convert ExperimentConfig to MoEModelConfig
+    moe_config = MoEModelConfig(
+        d_model=config.hidden_size,
+        n_heads=config.num_attention_heads,
+        n_layers=config.num_hidden_layers,
+        d_ff=config.intermediate_size if hasattr(config, 'intermediate_size') else config.hidden_size * 4,
+        max_seq_len=config.max_position_embeddings,
         vocab_size=config.vocab_size,
-        hidden_size=config.hidden_size,
-        num_hidden_layers=config.num_hidden_layers,
-        num_heads=config.num_attention_heads,
         
-        # DeltaNet specific parameters
-        expand_k=getattr(config, 'expand_k', 1.0),
-        expand_v=getattr(config, 'expand_v', 1.0),
-        
-        # MLP configuration
-        hidden_ratio=getattr(config, 'hidden_ratio', 4),
-        intermediate_size=config.intermediate_size if hasattr(config, 'intermediate_size') else None,
+        # MoE specific parameters
+        num_experts=getattr(config, 'num_experts', 8),
+        expert_top_k=getattr(config, 'expert_top_k', 2),
         
         # Regularization
-        norm_eps=config.rms_norm_eps,
+        dropout=getattr(config, 'dropout', 0.1),
         
-        # Optimization flags
-        fuse_norm=True,
-        fuse_cross_entropy=True,
-        
-        # Standard configs
-        max_position_embeddings=config.max_position_embeddings,
-        initializer_range=0.02,
-        use_cache=True,
-        
-        # Tokenizer configs
-        bos_token_id=1,
-        eos_token_id=2,
-        pad_token_id=0,
+        # Training params (for reference, not used by model)
+        batch_size=config.batch_size,
+        max_steps=config.max_steps,
     )
     
-    # Add hybrid attention configuration (WINNER from exp7)
-    if hasattr(config, 'attn_config') and config.attn_config is not None:
-        deltanet_config.attn = {
-            'layers': config.attn_config.get('layers', []),
-            'num_heads': config.num_attention_heads,
-            'num_kv_heads': config.attn_config.get('num_kv_heads', config.num_attention_heads),
-            'window_size': config.attn_config.get('window_size', 2048),
-            'qkv_bias': config.attn_config.get('qkv_bias', False),
-            'rope_theta': config.attn_config.get('rope_theta', 10000.0),
-        }
-    
-    # Create model
-    model = GatedDeltaNetForCausalLM(deltanet_config)
+    # Create MoE model
+    model = MoEMinimalLLM(moe_config)
     
     return model
 
@@ -99,90 +82,63 @@ def count_parameters(model):
 
 def verify_model_architecture(model, config):
     """
-    Verify that the model has the expected reasoning architecture
+    Verify that the model has the expected MoE architecture
     Returns dict with architecture info and verification status
     """
     model_class_name = model.__class__.__name__
-    is_deltanet = 'DeltaNet' in model_class_name
+    is_moe = 'MoE' in model_class_name
     
     # Count layers
-    actual_num_layers = len(model.model.layers)
+    actual_num_layers = len(model.transformer_blocks)
     expected_num_layers = config.num_hidden_layers
     
     # Verify layer structure and identify layer types
     layer_types = []
     all_layers_valid = True
-    deltanet_layers = []
-    attention_layers = []
+    moe_layers = []
     
-    for i, layer in enumerate(model.model.layers):
-        has_mlp = hasattr(layer, 'mlp')
+    for i, layer in enumerate(model.transformer_blocks):
         layer_type = layer.__class__.__name__
-        
-        mixer_type = None
-        if hasattr(layer, 'attn'):
-            mixer = layer.attn
-            mixer_class = mixer.__class__.__name__
-            if 'DeltaNet' in mixer_class:
-                mixer_type = 'GatedDeltaNet'
-                deltanet_layers.append(i)
-            elif 'Attention' in mixer_class:
-                mixer_type = 'Attention'
-                attention_layers.append(i)
-            else:
-                mixer_type = mixer_class
-        elif hasattr(layer, 'mixer'):
-            mixer = layer.mixer
-            mixer_class = mixer.__class__.__name__
-            if 'DeltaNet' in mixer_class:
-                mixer_type = 'DeltaNet'
-                deltanet_layers.append(i)
-            elif 'Attention' in mixer_class:
-                mixer_type = 'Attention'
-                attention_layers.append(i)
-            else:
-                mixer_type = mixer_class
+        has_attention = hasattr(layer, 'attention') or hasattr(layer, 'attn')
+        has_moe = hasattr(layer, 'moe') or 'MoE' in layer_type
         
         layer_info = {
             'idx': i,
             'type': layer_type,
-            'mixer_type': mixer_type,
-            'has_mlp': has_mlp,
-            'valid': mixer_type is not None and has_mlp,
+            'has_attention': has_attention,
+            'has_moe': has_moe,
+            'valid': has_attention and has_moe,
         }
         layer_types.append(layer_info)
         
-        if not (mixer_type is not None and has_mlp):
+        if has_moe:
+            moe_layers.append(i)
+        
+        if not (has_attention and has_moe):
             all_layers_valid = False
     
-    # Check if model is hybrid
-    is_hybrid = len(attention_layers) > 0 and len(deltanet_layers) > 0
-    
-    # Verify it matches exp7 winner configuration
-    expected_attention_layers = config.attn_config.get('layers', []) if config.attn_config else []
-    is_winner_config = set(attention_layers) == set(expected_attention_layers)
+    # Get MoE config
+    num_experts = config.num_experts if hasattr(config, 'num_experts') else 8
+    expert_top_k = config.expert_top_k if hasattr(config, 'expert_top_k') else 2
     
     verification_passed = (
-        is_deltanet and
+        is_moe and
         actual_num_layers == expected_num_layers and
         all_layers_valid and
-        is_hybrid and
-        is_winner_config
+        len(moe_layers) == expected_num_layers
     )
     
     info = {
         'verification_passed': verification_passed,
         'model_type': model_class_name,
-        'is_deltanet': is_deltanet,
-        'is_hybrid': is_hybrid,
-        'is_winner_config': is_winner_config,
+        'is_moe': is_moe,
         'num_layers': actual_num_layers,
         'expected_num_layers': expected_num_layers,
         'layers_match': actual_num_layers == expected_num_layers,
         'all_layers_valid': all_layers_valid,
-        'deltanet_layers': deltanet_layers,
-        'attention_layers': attention_layers,
-        'expected_attention_layers': expected_attention_layers,
+        'moe_layers': moe_layers,
+        'num_experts': num_experts,
+        'expert_top_k': expert_top_k,
         'layer_types': layer_types,
     }
     
@@ -192,7 +148,7 @@ def verify_model_architecture(model, config):
 class ReasoningModelWrapper(nn.Module):
     """
     Wrapper for reasoning model with convenience methods
-    Built on exp7's winning Hybrid Sparse 17% architecture
+    Built on MoE (Mixture of Experts) architecture
     
     Can optionally wrap with recursive reasoning for iterative refinement
     """
@@ -201,7 +157,7 @@ class ReasoningModelWrapper(nn.Module):
         self.config = config
         self.use_recursive = use_recursive
         
-        # Create base model (exp7 winner architecture)
+        # Create base model (MoE architecture)
         self.base_model = create_reasoning_model(config)
         
         # Optionally wrap with recursive reasoning
@@ -232,10 +188,11 @@ class ReasoningModelWrapper(nn.Module):
         Forward pass through the model
         
         For recursive models, accepts optional carry state
+        Returns dict with 'loss', 'logits', and optionally 'aux_loss'
         """
         if self.use_recursive:
             # Recursive forward with carry state
-            return self.model(
+            outputs = self.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 labels=labels,
@@ -243,13 +200,45 @@ class ReasoningModelWrapper(nn.Module):
                 **kwargs
             )
         else:
-            # Standard forward
-            return self.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-                **kwargs
-            )
+            # Standard forward through MoE
+            # MoE returns (logits, aux_loss) or just logits
+            model_output = self.model(input_ids, return_aux_loss=True)
+            
+            # Handle tuple output
+            if isinstance(model_output, tuple):
+                logits, aux_loss = model_output
+            else:
+                logits = model_output
+                aux_loss = None
+            
+            # Compute loss if labels provided
+            loss = None
+            if labels is not None:
+                # Shift logits and labels for next-token prediction
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+                
+                # Calculate cross-entropy loss
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1)
+                )
+                
+                # Add auxiliary loss if present
+                if aux_loss is not None:
+                    loss = loss + aux_loss
+            
+            # Return dict format expected by trainer
+            outputs = {
+                'loss': loss,
+                'logits': logits,
+            }
+            
+            if aux_loss is not None:
+                outputs['aux_loss'] = aux_loss
+        
+        return outputs
     
     def get_info(self):
         """Get model information"""
@@ -262,7 +251,8 @@ class ReasoningModelWrapper(nn.Module):
                 'num_heads': self.config.num_attention_heads,
                 'max_seq_len': self.config.max_position_embeddings,
                 'vocab_size': self.config.vocab_size,
-                'attention_layers': self.config.attn_config.get('layers', []) if self.config.attn_config else [],
+                'num_experts': getattr(self.config, 'num_experts', 8),
+                'expert_top_k': getattr(self.config, 'expert_top_k', 2),
             }
         }
     
@@ -272,7 +262,7 @@ class ReasoningModelWrapper(nn.Module):
         
         print("="*70)
         print("Reasoning Architecture Model (Exp8)")
-        print("Based on Exp7 Winner: Hybrid Sparse 17%")
+        print("Based on MoE (Mixture of Experts)")
         if self.use_recursive:
             print("Mode: RECURSIVE REASONING")
         else:
@@ -292,33 +282,26 @@ class ReasoningModelWrapper(nn.Module):
         verification_status = "✓ PASSED" if arch['verification_passed'] else "✗ FAILED"
         print(f"  Verification: {verification_status}")
         print(f"  Model Type: {arch['model_type']}")
-        print(f"  Is DeltaNet: {'✓' if arch['is_deltanet'] else '✗'}")
-        print(f"  Is Hybrid: {'✓' if arch['is_hybrid'] else '✗'}")
-        print(f"  Winner Config: {'✓' if arch.get('is_winner_config', False) else '✗'}")
-        
-        if arch.get('is_hybrid', False):
-            print(f"\n  🏆 HYBRID MODE (Exp7 Winner Configuration)")
-            print(f"  DeltaNet Layers: {len(arch['deltanet_layers'])} layers -> {arch['deltanet_layers']}")
-            print(f"  Attention Layers: {len(arch['attention_layers'])} layers -> {arch['attention_layers']}")
-            print(f"  Expected Attention: {arch.get('expected_attention_layers', [])}")
-            print(f"  Attention %: {len(arch['attention_layers']) / arch['num_layers'] * 100:.1f}%")
+        print(f"  Is MoE: {'✓' if arch.get('is_moe', False) else '✗'}")
         
         print(f"  Number of layers: {arch['num_layers']} (expected: {arch['expected_num_layers']})")
+        print(f"  MoE Layers: {len(arch.get('moe_layers', []))} layers")
+        print(f"  Experts per layer: {arch.get('num_experts', 'N/A')}")
+        print(f"  Active experts (top-k): {arch.get('expert_top_k', 'N/A')}")
         
         print("\nLayer Details:")
         for layer_info in arch['layer_types']:
             status = "✓" if layer_info['valid'] else "✗"
-            mixer = layer_info.get('mixer_type', 'unknown')
-            mlp_status = "mlp" if layer_info['has_mlp'] else "no-mlp"
-            layer_marker = "🎯" if layer_info['idx'] in arch.get('attention_layers', []) else "  "
-            print(f"  {layer_marker} Layer {layer_info['idx']:2d}: {mixer:15s} + {mlp_status:6s} {status}")
+            layer_type = layer_info.get('type', 'unknown')
+            attn_status = "attn" if layer_info.get('has_attention', False) else "no-attn"
+            moe_status = "moe" if layer_info.get('has_moe', False) else "no-moe"
+            print(f"  Layer {layer_info['idx']:2d}: {layer_type:20s} [{attn_status:7s} + {moe_status:6s}] {status}")
         
         print("\nOptimizations:")
-        print("  ✓ FLA Triton kernels")
-        print("  ✓ Fused RMSNorm")
-        print("  ✓ Fused cross entropy")
-        print("  ✓ Hybrid DeltaNet + Attention")
-        print("  ✓ Strategic attention placement (layers 5, 11)")
+        print("  ✓ Mixture of Experts (MoE)")
+        print("  ✓ Sparse expert activation")
+        print("  ✓ RMSNorm layers")
+        print("  ✓ Efficient transformer blocks")
         
         print("="*70)
 

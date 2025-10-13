@@ -1,17 +1,18 @@
 # Experiment 8: Reasoning Architecture
 
-Building reasoning capabilities on top of the winning architecture from Experiment 7, with optional **Recursive Reasoning** using Adaptive Compute Time (ACT).
+Building reasoning capabilities using **MoE (Mixture of Experts)** architecture, with optional **Recursive Reasoning** using Adaptive Compute Time (ACT).
 
 ## Two Modes
 
 ### 1. Baseline Mode
-Uses **Hybrid Sparse 17%** directly from Experiment 7:
+Uses **MoE architecture** with sparse expert activation:
 
 ```python
 # Configuration
 hidden_size: 768
 num_layers: 12
-attention_layers: [5, 11]  # 17% attention (mid and near-end)
+num_experts: 8          # Experts per MoE layer
+expert_top_k: 2         # Active experts per token
 learning_rate: 0.002
 batch_size: 48
 seq_len: 1024
@@ -28,14 +29,14 @@ halt_max_steps: 5    # Maximum reasoning steps
 use_act: True        # Adaptive Compute Time enabled
 ```
 
-## Why Exp7's Architecture?
+## Why MoE Architecture?
 
-From Experiment 7 results:
-- **Best validation loss**: 4.055 (best of 13 architectures tested)
-- **27% better** than pure Transformer (5.146)
-- **8% better** than pure DeltaNet (4.396)
-- **Throughput**: 118K tokens/sec
-- **Strategic placement**: Attention at layers 5 (mid) and 11 (near-end)
+Benefits of Mixture of Experts:
+- **Increased model capacity** without proportional compute increase
+- **Specialized experts** for different input patterns
+- **Sparse activation** - only top-k experts active per token
+- **Scalable** - can add more experts for more capacity
+- **Efficient** - constant compute per token regardless of expert count
 
 ## Recursive Reasoning Features
 
@@ -47,17 +48,16 @@ Based on Tiny Recursive Models (TRM):
 
 ## Architecture Details
 
-### Layer Configuration
-- **DeltaNet layers** (10): [0, 1, 2, 3, 4, 6, 7, 8, 9, 10]
-  - Efficient O(n) processing
-  - Strong inductive bias for sequential patterns
-  
-- **Attention layers** (2): [5, 11]
-  - Layer 5: Captures intermediate representations
-  - Layer 11: Refines high-level features before prediction
+### MoE Layer Configuration
+- **Transformer layers** (12): All layers use MoE
+  - Self-attention mechanism
+  - MoE feed-forward with 8 experts
+  - Top-2 expert routing per token
+  - Load balancing for expert utilization
 
 ### Model Stats
-- **Parameters**: ~302M (GatedDeltaNet with hybrid attention)
+- **Parameters**: ~100-300M (depends on expert configuration)
+- **Active parameters per token**: ~50-100M (due to sparse activation)
 - **Context length**: 1024 tokens
 - **Vocabulary**: ~50K tokens
 
@@ -67,7 +67,7 @@ Based on Tiny Recursive Models (TRM):
 
 #### 1. Train Baseline Only (Default)
 ```bash
-# Default: baseline with exp7 architecture
+# Default: baseline with MoE architecture
 python run_experiment.py
 ```
 
@@ -109,7 +109,7 @@ Generates:
 
 ## Experiment Goals
 
-1. **Baseline**: Establish baseline with exp7 winner (Hybrid Sparse 17%)
+1. **Baseline**: Establish baseline with MoE architecture
 2. **Recursive Reasoning**: Test hierarchical reasoning with ACT
 3. **Comparison**: Quantify improvement from recursive reasoning
 4. **Future**: Foundation for advanced reasoning capabilities
@@ -140,14 +140,21 @@ When training with recursive reasoning, additional metrics are tracked:
 - **q_continue_mean**: Average Q-value for continuing
 - **act_penalty**: Regularization loss encouraging efficient halting
 
+## MoE-Specific Metrics
+
+The MoE model also tracks:
+- **aux_loss**: Load balancing auxiliary loss
+- **expert_utilization**: Which experts are being used
+- **routing_entropy**: Diversity of expert selection
+
 ## Interpreting Results
 
 ### What to Look For
 
-**Baseline**: Clean exp7 winner performance
-- Val loss should match or be close to exp7 results (~4.055)
+**Baseline**: Clean MoE performance
+- Stable training with expert load balancing
 - Steady learning curve
-- No reasoning overhead
+- Efficient sparse computation
 
 **Recursive**: Iterative refinement benefits
 - Potentially lower val loss (if reasoning helps)
@@ -162,7 +169,7 @@ When training with recursive reasoning, additional metrics are tracked:
 ## Next Steps
 
 This experiment provides:
-- ✅ Baseline performance benchmark
+- ✅ MoE baseline performance benchmark
 - ✅ Recursive reasoning infrastructure
 - ✅ ACT-based adaptive depth
 - ✅ Comparison framework
@@ -172,11 +179,11 @@ Future enhancements:
 - Multi-step reasoning tasks
 - Verification and self-correction loops
 - Task-specific reasoning objectives
+- Expert specialization analysis
 
 ## References
 
-- Based on [Experiment 7](../exp7_hybrid_deltanet_ablation/README.md) findings
-- Uses [FLA (Flash Linear Attention)](https://github.com/sustcsonglin/flash-linear-attention) library
-- GatedDeltaNet architecture with hybrid attention support
+- Uses custom MoE implementation from `/models/moe_llm.py`
+- MoE architecture with sparse expert activation
 - Recursive reasoning inspired by [Tiny Recursive Models](https://github.com/google-deepmind/tiny-recursive-models)
 

@@ -1,9 +1,9 @@
 """
 Training script for Reasoning Architecture Experiment
-Experiment 8: Based on exp7's winning Hybrid Sparse 17% architecture
+Experiment 8: Based on MoE (Mixture of Experts) architecture
 
 Supports two modes:
-1. Baseline: Exp7 winner architecture (Hybrid Sparse 17%)
+1. Baseline: MoE architecture with sparse expert activation
 2. Recursive: Adds hierarchical reasoning with ACT halting
 
 Usage:
@@ -444,7 +444,7 @@ def train_single_model(config, use_recursive, model_type, train_loader, val_load
     # Create model
     dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float32
     if dtype == torch.float32:
-        print("⚠ Warning: bfloat16 not supported, FLA may have issues with float32")
+        print("⚠ Warning: bfloat16 not supported, using float32")
     
     model = ReasoningModelWrapper(config, use_recursive=use_recursive)
     model.print_info()
@@ -469,9 +469,10 @@ def train_single_model(config, use_recursive, model_type, train_loader, val_load
     results_summary = {
         'experiment_name': f'Reasoning Architecture ({model_type.capitalize()})',
         'model_type': model_type,
-        'base_architecture': 'Exp7 Hybrid Sparse 17%',
+        'base_architecture': 'MoE (Mixture of Experts)',
         'use_recursive': use_recursive,
-        'attention_layers': config.attn_config.get('layers', []) if config.attn_config else [],
+        'num_experts': getattr(config, 'num_experts', 8),
+        'expert_top_k': getattr(config, 'expert_top_k', 2),
         'config': {
             'hidden_size': config.hidden_size,
             'num_layers': config.num_hidden_layers,
@@ -548,7 +549,7 @@ def main():
     
     print("="*70)
     print(f"EXPERIMENT 8: {exp_name}")
-    print("Based on Exp7 Winner: Hybrid Sparse 17%")
+    print("Based on MoE (Mixture of Experts)")
     if args.compare:
         print("Mode: COMPARISON (Training both Baseline and Recursive)")
     elif args.model_type:
@@ -566,7 +567,7 @@ def main():
     
     print(f"\nUsing device: {device}")
     print(f"Configuration: {config.hidden_size}d, {config.num_hidden_layers} layers")
-    print(f"Winner Architecture: Attention at layers {config.attn_config.get('layers', [])} (17%)")
+    print(f"MoE Configuration: {config.num_experts} experts, top-{config.expert_top_k} activation")
     
     # Load data
     print("\n" + "="*70)

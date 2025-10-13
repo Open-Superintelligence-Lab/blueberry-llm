@@ -1,5 +1,2 @@
-
-
-# FLA (Flash Linear Attention) - required for GatedDeltaNet
-# Install from GitHub: pip install git+https://github.com/sustcsonglin/flash-linear-attention.git
-fla-flash-linear-attention
+# No additional requirements needed
+# MoE model uses standard PyTorch components
