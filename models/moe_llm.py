@@ -48,9 +48,15 @@ class MoEMinimalLLM(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, x, return_aux_loss=True):
-        # Token embeddings
-        x = self.token_embedding(x) * math.sqrt(self.config.d_model)
+    def forward(self, x=None, inputs_embeds=None, attention_mask=None, 
+                return_aux_loss=True, output_hidden_states=False, return_dict=False):
+        # Token embeddings (allow either input_ids or embeddings)
+        if inputs_embeds is None:
+            if x is None:
+                raise ValueError("Must provide either x (input_ids) or inputs_embeds")
+            x = self.token_embedding(x) * math.sqrt(self.config.d_model)
+        else:
+            x = inputs_embeds
         x = self.position_dropout(x)
 
         # Collect auxiliary losses from MoE layers
@@ -64,12 +70,28 @@ class MoEMinimalLLM(nn.Module):
 
         # Output projection
         x = self.norm(x)
+        hidden_states = x  # Save hidden states before LM head
         x = self.output_dropout(x)
         logits = self.lm_head(x)
 
         # Combine auxiliary losses
         total_aux_loss = sum(aux_losses) if aux_losses else None
 
+        # Return in HuggingFace-compatible format if requested
+        if return_dict:
+            from dataclasses import dataclass
+            @dataclass
+            class MoEOutput:
+                logits: torch.Tensor = None
+                last_hidden_state: torch.Tensor = None
+                aux_loss: torch.Tensor = None
+            
+            return MoEOutput(
+                logits=logits,
+                last_hidden_state=hidden_states if output_hidden_states else None,
+                aux_loss=total_aux_loss
+            )
+        
         if return_aux_loss:
             return logits, total_aux_loss
         return logits

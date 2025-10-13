@@ -1,0 +1,152 @@
+{
+  "R01_baseline": {
+    "success": true,
+    "final_loss": 7.728750228881836,
+    "avg_loss": 8.2895876455307,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.640625,
+    "val_perplexity": 2081.0439453125,
+    "time": 36.89570331573486,
+    "nan_encountered": false
+  },
+  "R02_minimal": {
+    "success": true,
+    "final_loss": 7.707499980926514,
+    "avg_loss": 8.280937685966492,
+    "min_loss": 7.416250228881836,
+    "val_loss": 7.5875,
+    "val_perplexity": 1973.3741455078125,
+    "time": 18.435898065567017,
+    "nan_encountered": false
+  },
+  "R03_deep": {
+    "success": true,
+    "final_loss": 7.768750190734863,
+    "avg_loss": 8.30281261920929,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.63125,
+    "val_perplexity": 2061.625244140625,
+    "time": 61.11956310272217,
+    "nan_encountered": false
+  },
+  "R04_more_H": {
+    "success": true,
+    "final_loss": 7.758749961853027,
+    "avg_loss": 8.296562595367432,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.63125,
+    "val_perplexity": 2061.625244140625,
+    "time": 31.57413601875305,
+    "nan_encountered": false
+  },
+  "R05_more_L": {
+    "success": true,
+    "final_loss": 7.758749961853027,
+    "avg_loss": 8.302500100135804,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.63125,
+    "val_perplexity": 2061.625244140625,
+    "time": 34.34369492530823,
+    "nan_encountered": false
+  },
+  "R06_no_act": {
+    "success": true,
+    "final_loss": 7.71875,
+    "avg_loss": 8.2725,
+    "min_loss": 7.46875,
+    "val_loss": 7.634375,
+    "val_perplexity": 2068.078369140625,
+    "time": 36.46597099304199,
+    "nan_encountered": false
+  },
+  "R07_high_explore": {
+    "success": true,
+    "final_loss": 7.697500228881836,
+    "avg_loss": 8.289900145530702,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.640625,
+    "val_perplexity": 2081.0439453125,
+    "time": 37.494709968566895,
+    "nan_encountered": false
+  },
+  "R08_low_explore": {
+    "success": true,
+    "final_loss": 7.728750228881836,
+    "avg_loss": 8.2892751455307,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.6375,
+    "val_perplexity": 2074.550537109375,
+    "time": 36.32687783241272,
+    "nan_encountered": false
+  },
+  "R09_extended_halt": {
+    "success": true,
+    "final_loss": 7.707499980926514,
+    "avg_loss": 8.314187598228454,
+    "min_loss": 7.538750171661377,
+    "val_loss": 7.63125,
+    "val_perplexity": 2061.625244140625,
+    "time": 36.197185754776,
+    "nan_encountered": false
+  },
+  "R10_low_lr": {
+    "success": true,
+    "final_loss": 8.510000228881836,
+    "avg_loss": 9.22490014076233,
+    "min_loss": 8.385000228881836,
+    "val_loss": 8.45625,
+    "val_perplexity": 4704.38427734375,
+    "time": 35.96485686302185,
+    "nan_encountered": false
+  },
+  "R11_high_lr": {
+    "success": true,
+    "final_loss": 7.728750228881836,
+    "avg_loss": 8.13083764076233,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.6375,
+    "val_perplexity": 2074.550537109375,
+    "time": 34.43140172958374,
+    "nan_encountered": false
+  },
+  "R12_med_lr": {
+    "success": true,
+    "final_loss": 7.728750228881836,
+    "avg_loss": 8.4608376455307,
+    "min_loss": 7.510000228881836,
+    "val_loss": 7.6375,
+    "val_perplexity": 2074.550537109375,
+    "time": 36.43868589401245,
+    "nan_encountered": false
+  },
+  "R13_optimized": {
+    "success": true,
+    "final_loss": 7.697500228881836,
+    "avg_loss": 8.118337640762329,
+    "min_loss": 7.478750228881836,
+    "val_loss": 7.634375,
+    "val_perplexity": 2068.078369140625,
+    "time": 32.35594081878662,
+    "nan_encountered": false
+  },
+  "R14_asym_H": {
+    "success": true,
+    "final_loss": 7.728750228881836,
+    "avg_loss": 8.292087645530701,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.6375,
+    "val_perplexity": 2074.550537109375,
+    "time": 26.159728527069092,
+    "nan_encountered": false
+  },
+  "R15_asym_L": {
+    "success": true,
+    "final_loss": 7.697500228881836,
+    "avg_loss": 8.3008376455307,
+    "min_loss": 7.49875020980835,
+    "val_loss": 7.6375,
+    "val_perplexity": 2074.550537109375,
+    "time": 26.387885093688965,
+    "nan_encountered": false
+  }
+}

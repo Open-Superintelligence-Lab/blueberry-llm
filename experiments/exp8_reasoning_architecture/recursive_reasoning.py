@@ -79,7 +79,10 @@ class RecursiveReasoningWrapper(nn.Module):
         self.config = config
         
         # Extract dimensions from base model
-        self.hidden_size = base_model.config.hidden_size
+        # Handle both hidden_size (standard) and d_model (MoE) naming conventions
+        self.hidden_size = getattr(base_model.config, 'hidden_size', None) or getattr(base_model.config, 'd_model', None)
+        if self.hidden_size is None:
+            raise ValueError("Could not determine hidden size from base model config")
         self.vocab_size = base_model.config.vocab_size
         
         # Recursive reasoning parameters
@@ -168,8 +171,17 @@ class RecursiveReasoningWrapper(nn.Module):
         carry = self.reset_carry(carry.halted, carry)
         
         # Get base model's embedding layer output
-        with torch.no_grad():
+        # Handle both MoE (token_embedding) and HF-style (model.embeddings) models
+        if hasattr(self.base_model, 'token_embedding'):
+            embeddings = self.base_model.token_embedding(input_ids)
+            # MoE model scales embeddings - match that scaling
+            if hasattr(self.base_model.config, 'd_model'):
+                import math
+                embeddings = embeddings * math.sqrt(self.base_model.config.d_model)
+        elif hasattr(self.base_model, 'model') and hasattr(self.base_model.model, 'embeddings'):
             embeddings = self.base_model.model.embeddings(input_ids)
+        else:
+            raise ValueError("Could not find embedding layer in base model")
         
         # Recursive reasoning cycles
         z_H, z_L = carry.z_H, carry.z_L
@@ -183,11 +195,12 @@ class RecursiveReasoningWrapper(nn.Module):
                     l_input_embeds = self.z_L_norm(z_L + self.H_to_L_proj(z_H) + embeddings)
                     
                     # Run through base model layers
-                    l_output = self.base_model.model.forward(
+                    l_output = self.base_model(
                         inputs_embeds=l_input_embeds,
                         attention_mask=attention_mask,
-                        output_hidden_states=False,
-                        return_dict=True
+                        output_hidden_states=True,
+                        return_dict=True,
+                        return_aux_loss=True
                     )
                     
                     # Update L state with residual
@@ -195,36 +208,40 @@ class RecursiveReasoningWrapper(nn.Module):
                 
                 # H-level update (high-level reasoning)
                 h_input_embeds = self.z_H_norm(z_H + self.L_to_H_proj(z_L))
-                h_output = self.base_model.model.forward(
+                h_output = self.base_model(
                     inputs_embeds=h_input_embeds,
                     attention_mask=attention_mask,
-                    output_hidden_states=False,
-                    return_dict=True
+                    output_hidden_states=True,
+                    return_dict=True,
+                    return_aux_loss=True
                 )
                 z_H = z_H + h_output.last_hidden_state
         
         # Final H cycle WITH gradient for learning
         for l_step in range(self.L_cycles):
             l_input_embeds = self.z_L_norm(z_L + self.H_to_L_proj(z_H) + embeddings)
-            l_output = self.base_model.model.forward(
+            l_output = self.base_model(
                 inputs_embeds=l_input_embeds,
                 attention_mask=attention_mask,
-                output_hidden_states=False,
-                return_dict=True
+                output_hidden_states=True,
+                return_dict=True,
+                return_aux_loss=True
             )
             z_L = z_L + l_output.last_hidden_state
         
         h_input_embeds = self.z_H_norm(z_H + self.L_to_H_proj(z_L))
-        h_output = self.base_model.model.forward(
+        h_output = self.base_model(
             inputs_embeds=h_input_embeds,
             attention_mask=attention_mask,
-            output_hidden_states=False,
-            return_dict=True
+            output_hidden_states=True,
+            return_dict=True,
+            return_aux_loss=True
         )
         z_H = z_H + h_output.last_hidden_state
         
         # Generate final logits through base model's LM head
-        logits = self.base_model.lm_head(z_H)
+        # Use the logits from the last output instead of calling lm_head again
+        logits = h_output.logits
         
         # ACT halting decision
         halt_decision = torch.zeros(batch_size, dtype=torch.bool, device=device)

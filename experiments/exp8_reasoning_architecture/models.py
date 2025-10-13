@@ -163,9 +163,9 @@ class ReasoningModelWrapper(nn.Module):
         # Optionally wrap with recursive reasoning
         if use_recursive:
             recursive_config = getattr(config, 'recursive', {
-                'H_cycles': 3,
-                'L_cycles': 3,
-                'halt_max_steps': 5,
+                'H_cycles': 2,  # Reduced from 3 for stability
+                'L_cycles': 2,  # Reduced from 3 for stability
+                'halt_max_steps': 3,  # Reduced from 5
                 'halt_exploration_prob': 0.1,
                 'use_act': True
             })

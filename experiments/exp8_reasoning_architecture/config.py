@@ -35,10 +35,10 @@ class ExperimentConfig:
     
     # Training (optimized for 4090)
     batch_size: int = 16
-    learning_rate: float = 2e-3  # 0.002
+    learning_rate: float = 3e-4  # 0.0003 - reduced for stability
     weight_decay: float = 0.1
-    max_steps: int = 1000
-    warmup_steps: int = 100
+    max_steps: int = 100
+    warmup_steps: int = 20  # Increased from 10 for better stability
     gradient_clip: float = 1.0
     
     # Optimizer
@@ -51,14 +51,14 @@ class ExperimentConfig:
     max_tokens: int = 70_000_000
     
     # Evaluation
-    eval_interval: int = 50
+    eval_interval: int = 25
     eval_batches: int = 10
     
     # Logging
     log_interval: int = 10
     
     # Checkpointing
-    save_interval: int = 500
+    save_interval: int = 100
     checkpoint_dir: str = "checkpoints"
     
     # Device
@@ -102,7 +102,7 @@ def get_base_reasoning_config():
         # Training params
         max_steps=1000,
         warmup_steps=100,
-        learning_rate=2e-3,  # 0.002 - good for MoE training
+        learning_rate=3e-4,  # 0.0003 - reduced for stability
         gradient_clip=1.0,
         
         # Data
@@ -140,11 +140,11 @@ def get_recursive_reasoning_config():
     """
     config = get_base_reasoning_config()
     
-    # Add recursive reasoning parameters
+    # Add recursive reasoning parameters (reduced for stability)
     config.recursive = {
-        'H_cycles': 3,  # High-level cycles
-        'L_cycles': 3,  # Low-level cycles per H cycle
-        'halt_max_steps': 5,  # Maximum reasoning steps
+        'H_cycles': 2,  # High-level cycles (reduced from 3)
+        'L_cycles': 2,  # Low-level cycles per H cycle (reduced from 3)
+        'halt_max_steps': 3,  # Maximum reasoning steps (reduced from 5)
         'halt_exploration_prob': 0.1,  # Exploration for ACT learning
         'use_act': True,  # Enable Adaptive Compute Time
     }

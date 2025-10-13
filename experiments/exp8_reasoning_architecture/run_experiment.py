@@ -104,7 +104,9 @@ class Trainer:
         def lr_lambda(step):
             if step < self.config.warmup_steps:
                 return step / max(1, self.config.warmup_steps)
-            return max(0.1, (self.config.max_steps - step) / (self.config.max_steps - self.config.warmup_steps))
+            # Avoid division by zero when warmup_steps == max_steps
+            decay_steps = max(1, self.config.max_steps - self.config.warmup_steps)
+            return max(0.1, (self.config.max_steps - step) / decay_steps)
         
         return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
     
