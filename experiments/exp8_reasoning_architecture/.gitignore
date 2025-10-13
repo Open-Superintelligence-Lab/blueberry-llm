@@ -1,0 +1,34 @@
+# Experiment 8 specific ignores
+
+# Checkpoints
+checkpoints/
+checkpoints_*/
+
+# Results
+results/
+results_*/
+
+# Data cache
+data_cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
