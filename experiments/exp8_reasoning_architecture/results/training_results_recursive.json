@@ -1,0 +1,126 @@
+{
+  "experiment_name": "Reasoning Architecture (Recursive)",
+  "model_type": "recursive",
+  "base_architecture": "MoE (Mixture of Experts)",
+  "use_recursive": true,
+  "num_experts": 4,
+  "expert_top_k": 2,
+  "config": {
+    "hidden_size": 512,
+    "num_layers": 8,
+    "num_heads": 8,
+    "max_seq_len": 512,
+    "batch_size": 16,
+    "learning_rate": 0.002,
+    "max_steps": 1000
+  },
+  "model_info": {
+    "parameters": {
+      "total": 101216770,
+      "trainable": 101216770,
+      "total_millions": 101.21677,
+      "trainable_millions": 101.21677
+    },
+    "architecture": {
+      "verification_passed": true,
+      "model_type": "MoEMinimalLLM",
+      "is_moe": true,
+      "num_layers": 8,
+      "expected_num_layers": 8,
+      "layers_match": true,
+      "all_layers_valid": true,
+      "moe_layers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "num_experts": 4,
+      "expert_top_k": 2,
+      "layer_types": [
+        {
+          "idx": 0,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 1,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 2,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 3,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 4,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 5,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 6,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        },
+        {
+          "idx": 7,
+          "type": "MoETransformerBlock",
+          "has_attention": true,
+          "has_moe": true,
+          "valid": true
+        }
+      ],
+      "is_recursive": true
+    },
+    "config": {
+      "hidden_size": 512,
+      "num_layers": 8,
+      "num_heads": 8,
+      "max_seq_len": 2048,
+      "vocab_size": 49152,
+      "num_experts": 4,
+      "expert_top_k": 2
+    }
+  },
+  "results": {
+    "total_time": 580.5446674823761,
+    "best_val_loss": 8.779647749510763,
+    "final_train_loss": 8.817500066757201,
+    "final_val_metrics": {
+      "step": 1000,
+      "loss": 8.779647749510763,
+      "accuracy": 0.04721135029354207,
+      "perplexity": 6500.58740234375
+    }
+  },
+  "recursive_config": {}
+}

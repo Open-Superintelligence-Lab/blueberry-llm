@@ -20,6 +20,12 @@
 
 **Conclusion:** For 1000-step training, baseline MoE outperforms recursive reasoning. Recursive models need 2000+ steps to potentially show benefits.
 
+### Training Curves
+
+![Best Baseline vs Best Reasoning Comparison](comparison_results/best_comparison.png)
+
+*Training and validation metrics comparing best baseline (blue) vs best reasoning (red) over 1000 steps.*
+
 ## Reasoning Ablations
 
 **15 configurations tested:**
@@ -32,6 +38,12 @@
 **Range:** 7.59 (best) to 8.45 (worst) val loss at 100 steps
 
 **Key finding:** Minimal recursion wins for limited training steps.
+
+### Ablation Results
+
+![Reasoning Ablation Comparison](reasoning_ablation_results/reasoning_ablation_comparison.png)
+
+*Comparison of 15 different recursive reasoning configurations showing training loss, validation loss, accuracy, and gradient norms over 100 steps.*
 
 ## Quick Start
 

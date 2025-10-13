@@ -5,7 +5,7 @@ checkpoints/
 checkpoints_*/
 
 # Results
-results/
+# results/
 results_*/
 
 # Data cache
