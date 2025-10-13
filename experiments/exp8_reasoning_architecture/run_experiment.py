@@ -2,21 +2,28 @@
 Training script for Reasoning Architecture Experiment
 Experiment 8: Based on exp7's winning Hybrid Sparse 17% architecture
 
-This experiment uses the best performing architecture from exp7 as the foundation
-for implementing reasoning capabilities.
+Supports two modes:
+1. Baseline: Exp7 winner architecture (Hybrid Sparse 17%)
+2. Recursive: Adds hierarchical reasoning with ACT halting
 
 Usage:
-    # Default: Base reasoning config
+    # Train baseline only (default)
     python run_experiment.py
     
-    # Extended training
-    python run_experiment.py --experiment extended
+    # Train recursive only
+    python run_experiment.py --model-type recursive
+    
+    # Train and compare both models
+    python run_experiment.py --compare
+    
+    # Extended training with comparison
+    python run_experiment.py --experiment extended --compare
     
     # Resume from checkpoint
-    python run_experiment.py --resume checkpoints/best_model.pt
+    python run_experiment.py --resume checkpoints_baseline/best_model.pt
     
     # Resume and extend training
-    python run_experiment.py --resume checkpoints/best_model.pt --extend-steps 5000
+    python run_experiment.py --resume checkpoints_baseline/best_model.pt --extend-steps 5000
 """
 
 import torch
@@ -41,11 +48,13 @@ from experiments.exp8_reasoning_architecture.config import (
     ExperimentConfig,
     get_base_reasoning_config,
     get_extended_reasoning_config,
+    get_recursive_reasoning_config,
 )
 from experiments.exp8_reasoning_architecture.models import (
     ReasoningModelWrapper,
     count_parameters,
 )
+from experiments.exp8_reasoning_architecture.recursive_reasoning import RecursiveCarryState
 from data.loader import load_and_cache_data
 from data.dataset import TextTokenDataset
 from utils.helpers import set_seed
@@ -55,7 +64,7 @@ from torch.utils.data import DataLoader
 class Trainer:
     """Training manager for Reasoning Model"""
     
-    def __init__(self, model, config, train_loader, val_loader, device, save_dir=None):
+    def __init__(self, model, config, train_loader, val_loader, device, save_dir=None, use_recursive=False):
         self.model = model
         self.config = config
         self.train_loader = train_loader
@@ -63,6 +72,7 @@ class Trainer:
         self.device = device
         self.save_dir = Path(save_dir) if save_dir else Path("checkpoints")
         self.save_dir.mkdir(exist_ok=True, parents=True)
+        self.use_recursive = use_recursive
         
         # Optimizer
         self.optimizer = torch.optim.AdamW(
@@ -85,6 +95,9 @@ class Trainer:
         # History
         self.train_history = []
         self.val_history = []
+        
+        # Carry state for recursive reasoning (if enabled)
+        self.carry = None
     
     def _create_scheduler(self):
         """Create learning rate scheduler with warmup"""
@@ -96,7 +109,7 @@ class Trainer:
         return torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
     
     def train_step(self, batch):
-        """Single training step"""
+        """Single training step with optional carry state for recursive reasoning"""
         self.model.train()
         
         # Handle tuple output from dataset
@@ -107,9 +120,16 @@ class Trainer:
         
         labels = input_ids.clone()
         
-        # Forward pass
-        outputs = self.model(input_ids=input_ids, labels=labels)
-        loss = outputs.loss
+        # Forward pass (with carry state if recursive)
+        if self.use_recursive:
+            outputs = self.model(input_ids=input_ids, labels=labels, carry=self.carry)
+            # Update carry for next iteration
+            if 'carry' in outputs:
+                self.carry = outputs['carry']
+        else:
+            outputs = self.model(input_ids=input_ids, labels=labels)
+        
+        loss = outputs['loss'] if isinstance(outputs, dict) else outputs.loss
         
         # Backward pass
         loss.backward()
@@ -122,16 +142,20 @@ class Trainer:
         self.scheduler.step()
         self.optimizer.zero_grad()
         
-        return loss.item()
+        # Extract metrics for recursive model
+        metrics = outputs.get('metrics', {}) if isinstance(outputs, dict) else {}
+        
+        return loss.item(), metrics
     
     @torch.no_grad()
     def evaluate(self, max_batches=None):
-        """Evaluate on validation set"""
+        """Evaluate on validation set with optional carry state"""
         self.model.eval()
         
         total_loss = 0
         total_correct = 0
         total_tokens = 0
+        eval_carry = None
         
         for i, batch in enumerate(self.val_loader):
             if max_batches and i >= max_batches:
@@ -145,9 +169,16 @@ class Trainer:
             
             labels = input_ids.clone()
             
-            outputs = self.model(input_ids=input_ids, labels=labels)
-            loss = outputs.loss
-            logits = outputs.logits
+            # Forward with carry if recursive
+            if self.use_recursive:
+                outputs = self.model(input_ids=input_ids, labels=labels, carry=eval_carry)
+                if 'carry' in outputs:
+                    eval_carry = outputs['carry']
+            else:
+                outputs = self.model(input_ids=input_ids, labels=labels)
+            
+            loss = outputs['loss'] if isinstance(outputs, dict) else outputs.loss
+            logits = outputs['logits'] if isinstance(outputs, dict) else outputs.logits
             
             # Calculate accuracy
             predictions = logits.argmax(dim=-1)
@@ -178,6 +209,7 @@ class Trainer:
         start_time = time.time()
         running_loss = 0
         steps_since_log = 0
+        running_metrics = {}
         
         while self.global_step < self.config.max_steps:
             for batch in self.train_loader:
@@ -185,10 +217,16 @@ class Trainer:
                     break
                 
                 # Training step
-                loss = self.train_step(batch)
+                loss, metrics = self.train_step(batch)
                 running_loss += loss
                 steps_since_log += 1
                 self.global_step += 1
+                
+                # Accumulate metrics
+                for k, v in metrics.items():
+                    if k not in running_metrics:
+                        running_metrics[k] = 0
+                    running_metrics[k] += v
                 
                 # Logging
                 if self.global_step % self.config.log_interval == 0:
@@ -197,19 +235,34 @@ class Trainer:
                     elapsed = time.time() - start_time
                     steps_per_sec = self.global_step / elapsed
                     
-                    print(f"Step {self.global_step}/{self.config.max_steps} | "
-                          f"Loss: {avg_loss:.4f} | "
-                          f"LR: {lr:.6f} | "
-                          f"Speed: {steps_per_sec:.2f} steps/s")
+                    log_msg = (f"Step {self.global_step}/{self.config.max_steps} | "
+                              f"Loss: {avg_loss:.4f} | "
+                              f"LR: {lr:.6f} | "
+                              f"Speed: {steps_per_sec:.2f} steps/s")
                     
-                    self.train_history.append({
+                    # Add recursive metrics if available
+                    if self.use_recursive and running_metrics:
+                        avg_metrics = {k: v / steps_since_log for k, v in running_metrics.items()}
+                        log_msg += f" | Steps: {avg_metrics.get('reasoning_steps', 0):.1f} | Halt: {avg_metrics.get('halt_rate', 0):.2%}"
+                    
+                    print(log_msg)
+                    
+                    history_entry = {
                         'step': self.global_step,
                         'loss': avg_loss,
                         'lr': lr,
-                    })
+                    }
+                    
+                    # Add avg metrics to history
+                    if running_metrics:
+                        for k, v in running_metrics.items():
+                            history_entry[k] = v / steps_since_log
+                    
+                    self.train_history.append(history_entry)
                     
                     running_loss = 0
                     steps_since_log = 0
+                    running_metrics = {}
                 
                 # Evaluation
                 if self.global_step % self.config.eval_interval == 0:
@@ -381,12 +434,102 @@ def plot_training_curves(train_history, val_history, save_path):
     print(f"Training curves saved to: {save_path}")
 
 
+def train_single_model(config, use_recursive, model_type, train_loader, val_loader, device, exp_base_dir):
+    """Train a single model (baseline or recursive)"""
+    
+    print("\n" + "="*70)
+    print(f"Training {model_type.upper()} Model")
+    print("="*70)
+    
+    # Create model
+    dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float32
+    if dtype == torch.float32:
+        print("⚠ Warning: bfloat16 not supported, FLA may have issues with float32")
+    
+    model = ReasoningModelWrapper(config, use_recursive=use_recursive)
+    model.print_info()
+    model = model.to(device=device, dtype=dtype)
+    print(f"\nUsing dtype: {dtype}")
+    
+    # Setup directories
+    checkpoints_dir = exp_base_dir / f"checkpoints_{model_type}"
+    results_dir = exp_base_dir / "results"
+    results_dir.mkdir(exist_ok=True, parents=True)
+    
+    print(f"\n📁 Output directories:")
+    print(f"   Checkpoints: {checkpoints_dir}")
+    print(f"   Results: {results_dir}")
+    
+    # Train
+    trainer = Trainer(model, config, train_loader, val_loader, device, 
+                     save_dir=checkpoints_dir, use_recursive=use_recursive)
+    results = trainer.train()
+    
+    # Save results
+    results_summary = {
+        'experiment_name': f'Reasoning Architecture ({model_type.capitalize()})',
+        'model_type': model_type,
+        'base_architecture': 'Exp7 Hybrid Sparse 17%',
+        'use_recursive': use_recursive,
+        'attention_layers': config.attn_config.get('layers', []) if config.attn_config else [],
+        'config': {
+            'hidden_size': config.hidden_size,
+            'num_layers': config.num_hidden_layers,
+            'num_heads': config.num_attention_heads,
+            'max_seq_len': config.max_seq_len,
+            'batch_size': config.batch_size,
+            'learning_rate': config.learning_rate,
+            'max_steps': config.max_steps,
+        },
+        'model_info': model.get_info(),
+        'results': {
+            'total_time': results['total_time'],
+            'best_val_loss': results['best_val_loss'],
+            'final_train_loss': results['train_history'][-1]['loss'] if results['train_history'] else None,
+            'final_val_metrics': results['val_history'][-1] if results['val_history'] else None,
+        },
+    }
+    
+    # Add recursive-specific config if applicable
+    if use_recursive:
+        results_summary['recursive_config'] = getattr(config, 'recursive', {})
+    
+    # Save with model_type suffix
+    results_file = results_dir / f'training_results_{model_type}.json'
+    with open(results_file, 'w') as f:
+        json.dump(results_summary, f, indent=2)
+    
+    print(f"\nResults saved to: {results_file}")
+    
+    # Plot training curves
+    curves_file = results_dir / f'training_curves_{model_type}.png'
+    plot_training_curves(
+        results['train_history'],
+        results['val_history'],
+        curves_file
+    )
+    
+    print("\n" + "="*70)
+    print(f"✅ {model_type.upper()} TRAINING COMPLETED!")
+    print("="*70)
+    print(f"   Best Val Loss: {results['best_val_loss']:.4f}")
+    print(f"   Training Time: {results['total_time']:.1f}s")
+    print("="*70)
+    
+    return results_summary
+
+
 def main():
-    """Main experiment function"""
+    """Main experiment function with dual training support"""
     parser = argparse.ArgumentParser(description='Train Reasoning Architecture (Exp8)')
     parser.add_argument('--experiment', type=str, default='base',
-                        choices=['base', 'extended'],
+                        choices=['base', 'extended', 'recursive'],
                         help='Experiment variant (default: base)')
+    parser.add_argument('--compare', action='store_true', default=False,
+                        help='Train both baseline and recursive models for comparison')
+    parser.add_argument('--model-type', type=str, default=None,
+                        choices=['baseline', 'recursive'],
+                        help='Train specific model type (overrides --compare)')
     parser.add_argument('--resume', type=str, default=None, 
                         help='Path to checkpoint to resume from')
     parser.add_argument('--extend-steps', type=int, default=None,
@@ -397,6 +540,7 @@ def main():
     EXPERIMENTS = {
         'base': ('Reasoning Architecture (Base)', get_base_reasoning_config),
         'extended': ('Reasoning Architecture (Extended)', get_extended_reasoning_config),
+        'recursive': ('Reasoning Architecture (Recursive)', get_recursive_reasoning_config),
     }
     
     exp_name, get_config_fn = EXPERIMENTS[args.experiment]
@@ -405,24 +549,14 @@ def main():
     print("="*70)
     print(f"EXPERIMENT 8: {exp_name}")
     print("Based on Exp7 Winner: Hybrid Sparse 17%")
+    if args.compare:
+        print("Mode: COMPARISON (Training both Baseline and Recursive)")
+    elif args.model_type:
+        print(f"Mode: Single Model ({args.model_type.upper()})")
     print("="*70)
     
     set_seed(config.seed)
     device = torch.device(config.device if torch.cuda.is_available() else 'cpu')
-    
-    # Resume handling
-    resume_checkpoint_path = None
-    if args.resume:
-        resume_checkpoint_path = Path(args.resume)
-        if not resume_checkpoint_path.exists():
-            print(f"\n❌ Error: Checkpoint not found: {resume_checkpoint_path}")
-            return
-        
-        print(f"\nLoading config from checkpoint: {resume_checkpoint_path}")
-        torch.serialization.add_safe_globals([ExperimentConfig])
-        checkpoint_data = torch.load(resume_checkpoint_path, map_location='cpu', weights_only=False)
-        config = checkpoint_data['config']
-        print(f"✓ Config loaded from checkpoint")
     
     # Extend training steps if requested
     if args.extend_steps:
@@ -475,86 +609,95 @@ def main():
     print(f"Train windows available: {len(train_loader):,}")
     print(f"Val windows available: {len(val_loader):,}")
     
-    # Create model
-    print("\n" + "="*70)
-    print("Creating Model")
-    print("="*70)
-    
-    dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float32
-    if dtype == torch.float32:
-        print("⚠ Warning: bfloat16 not supported, FLA may have issues with float32")
-    
-    model = ReasoningModelWrapper(config)
-    model.print_info()
-    model = model.to(device=device, dtype=dtype)
-    print(f"\nUsing dtype: {dtype}")
-    
-    # Train
     exp_base_dir = Path(__file__).parent
-    results_dir = exp_base_dir / "results"
-    checkpoints_dir = exp_base_dir / "checkpoints"
     
-    print(f"\n📁 Output directories:")
-    print(f"   Checkpoints: {checkpoints_dir}")
-    print(f"   Results: {results_dir}")
-    
-    trainer = Trainer(model, config, train_loader, val_loader, device, save_dir=checkpoints_dir)
-    
-    if resume_checkpoint_path:
-        trainer.load_checkpoint(resume_checkpoint_path)
-    
-    results = trainer.train()
-    
-    # Save results
-    results_dir.mkdir(exist_ok=True, parents=True)
-    
-    results_summary = {
-        'experiment_name': exp_name,
-        'base_architecture': 'Exp7 Hybrid Sparse 17%',
-        'attention_layers': config.attn_config.get('layers', []) if config.attn_config else [],
-        'config': {
-            'hidden_size': config.hidden_size,
-            'num_layers': config.num_hidden_layers,
-            'num_heads': config.num_attention_heads,
-            'max_seq_len': config.max_seq_len,
-            'batch_size': config.batch_size,
-            'learning_rate': config.learning_rate,
-            'max_steps': config.max_steps,
-        },
-        'model_info': model.get_info(),
-        'results': {
-            'total_time': results['total_time'],
-            'best_val_loss': results['best_val_loss'],
-            'final_train_loss': results['train_history'][-1]['loss'] if results['train_history'] else None,
-            'final_val_metrics': results['val_history'][-1] if results['val_history'] else None,
-        },
-    }
-    
-    with open(results_dir / 'training_results.json', 'w') as f:
-        json.dump(results_summary, f, indent=2)
-    
-    print(f"\nResults saved to: {results_dir / 'training_results.json'}")
-    
-    # Plot training curves
-    plot_training_curves(
-        results['train_history'],
-        results['val_history'],
-        results_dir / 'training_curves.png'
-    )
-    
-    print("\n" + "="*70)
-    print("✅ EXPERIMENT COMPLETED SUCCESSFULLY!")
-    print("="*70)
-    print(f"\n📊 Results Summary:")
-    print(f"   Experiment: {exp_name}")
-    print(f"   Best Val Loss: {results['best_val_loss']:.4f}")
-    print(f"   Training Time: {results['total_time']:.1f}s")
-    print(f"\n💾 Saved Files:")
-    print(f"   Checkpoints: {checkpoints_dir}/")
-    print(f"   Results: {results_dir}/")
-    print(f"   Training curves: {results_dir / 'training_curves.png'}")
-    print(f"   JSON results: {results_dir / 'training_results.json'}")
-    print("="*70)
+    # Determine which models to train
+    if args.model_type:
+        # Train specific model type
+        use_recursive = args.model_type == 'recursive'
+        results_summary = train_single_model(
+            config, use_recursive, args.model_type,
+            train_loader, val_loader, device, exp_base_dir
+        )
+        
+        print("\n" + "="*70)
+        print("✅ TRAINING COMPLETED SUCCESSFULLY!")
+        print("="*70)
+        print(f"   Model Type: {args.model_type}")
+        print(f"   Best Val Loss: {results_summary['results']['best_val_loss']:.4f}")
+        print("="*70)
+        
+    elif args.compare:
+        # Train both baseline and recursive models
+        print("\n" + "="*70)
+        print("DUAL TRAINING: Baseline + Recursive")
+        print("="*70)
+        
+        # Train baseline first
+        baseline_summary = train_single_model(
+            config, False, 'baseline',
+            train_loader, val_loader, device, exp_base_dir
+        )
+        
+        # Get recursive config if not already using it
+        if not hasattr(config, 'recursive'):
+            recursive_config = get_recursive_reasoning_config()
+        else:
+            recursive_config = config
+        
+        # Train recursive
+        recursive_summary = train_single_model(
+            recursive_config, True, 'recursive',
+            train_loader, val_loader, device, exp_base_dir
+        )
+        
+        # Run comparison script
+        print("\n" + "="*70)
+        print("Running Comparison Analysis...")
+        print("="*70)
+        
+        try:
+            import subprocess
+            comparison_script = exp_base_dir / "compare_baseline_vs_recursive.py"
+            if comparison_script.exists():
+                result = subprocess.run(
+                    [sys.executable, str(comparison_script)],
+                    cwd=str(exp_base_dir),
+                    capture_output=True,
+                    text=True
+                )
+                if result.returncode == 0:
+                    print(result.stdout)
+                else:
+                    print(f"⚠ Comparison script failed: {result.stderr}")
+            else:
+                print(f"⚠ Comparison script not found: {comparison_script}")
+                print("Run manually: python compare_baseline_vs_recursive.py")
+        except Exception as e:
+            print(f"⚠ Could not run comparison script: {e}")
+            print("Run manually: python compare_baseline_vs_recursive.py")
+        
+        print("\n" + "="*70)
+        print("✅ DUAL TRAINING COMPLETED!")
+        print("="*70)
+        print(f"Baseline Val Loss: {baseline_summary['results']['best_val_loss']:.4f}")
+        print(f"Recursive Val Loss: {recursive_summary['results']['best_val_loss']:.4f}")
+        improvement = (baseline_summary['results']['best_val_loss'] - recursive_summary['results']['best_val_loss']) / baseline_summary['results']['best_val_loss'] * 100
+        print(f"Improvement: {improvement:+.2f}%")
+        print("="*70)
+        
+    else:
+        # Default: train baseline only
+        results_summary = train_single_model(
+            config, False, 'baseline',
+            train_loader, val_loader, device, exp_base_dir
+        )
+        
+        print("\n" + "="*70)
+        print("✅ TRAINING COMPLETED SUCCESSFULLY!")
+        print("="*70)
+        print(f"   Best Val Loss: {results_summary['results']['best_val_loss']:.4f}")
+        print("="*70)
 
 
 if __name__ == "__main__":

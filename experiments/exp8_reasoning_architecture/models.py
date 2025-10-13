@@ -5,6 +5,8 @@ Based on FLA's Gated DeltaNet with exp7's winning hybrid configuration
 Uses the winning Hybrid Sparse 17% architecture:
 - Attention at layers [5, 11]
 - DeltaNet for remaining layers
+
+Optional: Wrap with recursive reasoning for iterative refinement
 """
 
 import torch
@@ -13,6 +15,12 @@ from typing import Optional
 
 # Use FLA's Gated DeltaNet implementation (supports hybrid with attention)
 from fla.models import GatedDeltaNetConfig, GatedDeltaNetForCausalLM
+
+# Import recursive reasoning wrapper
+from experiments.exp8_reasoning_architecture.recursive_reasoning import (
+    create_recursive_reasoning_model,
+    RecursiveCarryState
+)
 
 
 def create_reasoning_model(config):
@@ -185,22 +193,63 @@ class ReasoningModelWrapper(nn.Module):
     """
     Wrapper for reasoning model with convenience methods
     Built on exp7's winning Hybrid Sparse 17% architecture
+    
+    Can optionally wrap with recursive reasoning for iterative refinement
     """
-    def __init__(self, config):
+    def __init__(self, config, use_recursive=False):
         super().__init__()
         self.config = config
-        self.model = create_reasoning_model(config)
+        self.use_recursive = use_recursive
+        
+        # Create base model (exp7 winner architecture)
+        self.base_model = create_reasoning_model(config)
+        
+        # Optionally wrap with recursive reasoning
+        if use_recursive:
+            recursive_config = getattr(config, 'recursive', {
+                'H_cycles': 3,
+                'L_cycles': 3,
+                'halt_max_steps': 5,
+                'halt_exploration_prob': 0.1,
+                'use_act': True
+            })
+            self.model = create_recursive_reasoning_model(self.base_model, recursive_config)
+        else:
+            self.model = self.base_model
+        
         self.param_info = count_parameters(self.model)
-        self.arch_info = verify_model_architecture(self.model, config)
+        
+        # Architecture verification (only for base model)
+        if not use_recursive:
+            self.arch_info = verify_model_architecture(self.model, config)
+        else:
+            # For recursive, verify the base model
+            self.arch_info = verify_model_architecture(self.base_model, config)
+            self.arch_info['is_recursive'] = True
     
-    def forward(self, input_ids, attention_mask=None, labels=None, **kwargs):
-        """Forward pass through the model"""
-        return self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            labels=labels,
-            **kwargs
-        )
+    def forward(self, input_ids, attention_mask=None, labels=None, carry=None, **kwargs):
+        """
+        Forward pass through the model
+        
+        For recursive models, accepts optional carry state
+        """
+        if self.use_recursive:
+            # Recursive forward with carry state
+            return self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+                carry=carry,
+                **kwargs
+            )
+        else:
+            # Standard forward
+            return self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+                **kwargs
+            )
     
     def get_info(self):
         """Get model information"""
@@ -224,6 +273,10 @@ class ReasoningModelWrapper(nn.Module):
         print("="*70)
         print("Reasoning Architecture Model (Exp8)")
         print("Based on Exp7 Winner: Hybrid Sparse 17%")
+        if self.use_recursive:
+            print("Mode: RECURSIVE REASONING")
+        else:
+            print("Mode: BASELINE")
         print("="*70)
         
         print("\nParameters:")

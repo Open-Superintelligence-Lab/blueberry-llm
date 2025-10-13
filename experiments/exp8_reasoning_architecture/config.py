@@ -142,6 +142,29 @@ def get_extended_reasoning_config():
     return config
 
 
+def get_recursive_reasoning_config():
+    """
+    Recursive reasoning config with hierarchical cycles and ACT
+    
+    Adds recursive reasoning on top of the winning architecture:
+    - H_cycles: High-level reasoning iterations
+    - L_cycles: Low-level reasoning iterations per H cycle
+    - ACT: Adaptive compute time for dynamic depth
+    """
+    config = get_base_reasoning_config()
+    
+    # Add recursive reasoning parameters
+    config.recursive = {
+        'H_cycles': 3,  # High-level cycles
+        'L_cycles': 3,  # Low-level cycles per H cycle
+        'halt_max_steps': 5,  # Maximum reasoning steps
+        'halt_exploration_prob': 0.1,  # Exploration for ACT learning
+        'use_act': True,  # Enable Adaptive Compute Time
+    }
+    
+    return config
+
+
 # Alias for convenience
 get_reasoning_config = get_base_reasoning_config
 
