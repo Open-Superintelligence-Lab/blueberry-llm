@@ -12,17 +12,17 @@ from typing import List, Optional
 
 @dataclass
 class ExperimentConfig:
-    """Configuration for Reasoning Architecture experiment"""
+    """Configuration for Reasoning Architecture experiment (4090-optimized)"""
     
-    # Model Architecture
+    # Model Architecture (reduced for 4090)
     vocab_size: int = 50257
-    hidden_size: int = 768
-    num_hidden_layers: int = 12
-    num_attention_heads: int = 12
+    hidden_size: int = 512
+    num_hidden_layers: int = 8
+    num_attention_heads: int = 8
     max_position_embeddings: int = 2048
     
-    # MoE specific parameters
-    num_experts: int = 8  # Number of expert networks per MoE layer
+    # MoE specific parameters (reduced for 4090)
+    num_experts: int = 4  # Number of expert networks per MoE layer
     expert_top_k: int = 2  # Number of experts to activate per token
     
     # MLP configuration
@@ -33,9 +33,9 @@ class ExperimentConfig:
     rms_norm_eps: float = 1e-6
     dropout: float = 0.1
     
-    # Training (from exp7 winner)
-    batch_size: int = 48
-    learning_rate: float = 2e-3  # 0.002 - optimal for hybrids
+    # Training (optimized for 4090)
+    batch_size: int = 16
+    learning_rate: float = 2e-3  # 0.002
     weight_decay: float = 0.1
     max_steps: int = 1000
     warmup_steps: int = 100
@@ -46,13 +46,13 @@ class ExperimentConfig:
     eps: float = 1e-8
     
     # Data
-    max_seq_len: int = 1024
+    max_seq_len: int = 512
     num_documents: int = 70_000
     max_tokens: int = 70_000_000
     
     # Evaluation
     eval_interval: int = 50
-    eval_batches: int = 20
+    eval_batches: int = 10
     
     # Logging
     log_interval: int = 10
@@ -76,27 +76,28 @@ class ExperimentConfig:
 def get_base_reasoning_config():
     """
     Base reasoning config using MoE (Mixture of Experts) architecture
+    Optimized for RTX 4090 (24GB VRAM)
     
     Architecture:
-    - 768 hidden dimensions
-    - 12 transformer layers with MoE
-    - 8 experts per layer, activating top-2 per token
+    - 512 hidden dimensions (reduced from 768)
+    - 8 transformer layers with MoE (reduced from 12)
+    - 4 experts per layer, activating top-2 per token (reduced from 8)
     - Learning rate: 0.002 for stable MoE training
     """
     config = ExperimentConfig(
-        # Model architecture - MoE
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
+        # Model architecture - MoE (4090-friendly)
+        hidden_size=512,
+        num_hidden_layers=8,
+        num_attention_heads=8,
         hidden_ratio=4,
         
-        # MoE configuration
-        num_experts=8,
+        # MoE configuration (reduced)
+        num_experts=4,
         expert_top_k=2,
         
-        # Sequence and batch configuration
-        max_seq_len=1024,
-        batch_size=48,
+        # Sequence and batch configuration (reduced for 4090)
+        max_seq_len=512,
+        batch_size=16,
         
         # Training params
         max_steps=1000,
@@ -110,7 +111,7 @@ def get_base_reasoning_config():
         
         # Evaluation settings
         eval_interval=50,
-        eval_batches=20,
+        eval_batches=10,  # Reduced from 20
         log_interval=10,
     )
     

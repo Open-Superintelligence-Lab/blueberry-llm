@@ -5,17 +5,17 @@ Building reasoning capabilities using **MoE (Mixture of Experts)** architecture,
 ## Two Modes
 
 ### 1. Baseline Mode
-Uses **MoE architecture** with sparse expert activation:
+Uses **MoE architecture** with sparse expert activation (optimized for RTX 4090):
 
 ```python
-# Configuration
-hidden_size: 768
-num_layers: 12
-num_experts: 8          # Experts per MoE layer
+# Configuration (4090-optimized)
+hidden_size: 512        # Reduced for 24GB VRAM
+num_layers: 8           # Reduced from 12
+num_experts: 4          # Experts per MoE layer (reduced from 8)
 expert_top_k: 2         # Active experts per token
 learning_rate: 0.002
-batch_size: 48
-seq_len: 1024
+batch_size: 16          # Reduced from 48
+seq_len: 512            # Reduced from 1024
 ```
 
 ### 2. Recursive Reasoning Mode  
@@ -48,18 +48,19 @@ Based on Tiny Recursive Models (TRM):
 
 ## Architecture Details
 
-### MoE Layer Configuration
-- **Transformer layers** (12): All layers use MoE
+### MoE Layer Configuration (4090)
+- **Transformer layers** (8): All layers use MoE
   - Self-attention mechanism
-  - MoE feed-forward with 8 experts
+  - MoE feed-forward with 4 experts
   - Top-2 expert routing per token
   - Load balancing for expert utilization
 
-### Model Stats
-- **Parameters**: ~100-300M (depends on expert configuration)
-- **Active parameters per token**: ~50-100M (due to sparse activation)
-- **Context length**: 1024 tokens
+### Model Stats (4090 Configuration)
+- **Parameters**: ~50-100M (reduced for 4090)
+- **Active parameters per token**: ~25-50M (due to sparse activation)
+- **Context length**: 512 tokens
 - **Vocabulary**: ~50K tokens
+- **Memory footprint**: ~8-12GB VRAM (fits comfortably on 24GB)
 
 ## Usage
 
