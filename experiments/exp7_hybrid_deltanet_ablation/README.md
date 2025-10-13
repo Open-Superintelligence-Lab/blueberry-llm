@@ -2,6 +2,8 @@
 
 Ablation study testing 13 architectures (0-100% attention) to find the optimal DeltaNet/Attention hybrid ratio for language modeling.
 
+FLA works well on H100 GPUs, other architectures might have issues.
+
 Experiments are not exhaustive, but there is a strong base to continue experimentation.
 
 **📺 Video Overview:** [Watch on YouTube](https://www.youtube.com/watch?v=tf3ESMqDOTY)
