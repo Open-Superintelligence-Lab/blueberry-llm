@@ -75,17 +75,22 @@ class MoETransformerBlock(nn.Module):
             d_model, d_ff, num_experts, top_k, dropout
         )
 
-        # Normalization layers
-        self.norm1 = nn.RMSNorm(d_model)
-        self.norm2 = nn.RMSNorm(d_model)
+        # Pre Normalization layers
+        self.pre_norm1 = nn.RMSNorm(d_model)
+        self.pre_norm2 = nn.RMSNorm(d_model)
+
+        # Post Normalization layers
+        self.post_norm1 = nn.RMSNorm(d_model)
+        self.post_norm2 = nn.RMSNorm(d_model)
+
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         # Self-attention
-        attn_out = self.attention(self.norm1(x))
+        attn_out = self.post_norm2(self.attention(self.pre_norm1(x)))
         x = x + self.dropout(attn_out)
 
         # MoE feed-forward
-        ff_out, aux_loss = self.feed_forward(self.norm2(x))
+        ff_out, aux_loss = self.post_norm2(self.feed_forward(self.pre_norm2(x)))
         x = x + self.dropout(ff_out)
         return x, aux_loss
