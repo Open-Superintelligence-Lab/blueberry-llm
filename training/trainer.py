@@ -12,7 +12,7 @@ from configs.moe_config import MoEModelConfig
 from models.moe_llm import MoEMinimalLLM
 from optimizers import Muon, FlashMuon
 from training.evaluation import evaluate_model
-from utils.helpers import set_seed
+from utils.helpers import set_seed, unpack_batch
 
 def _is_muon_param(name: str, p: nn.Parameter) -> bool:
     """Muon rule: 2-D weight matrix, no embeddings, no norm layers."""
@@ -88,11 +88,11 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     eval_times = []
 
     while step < config.max_steps:
-        for batch_idx, (x, y) in enumerate(train_loader):
+        for batch_idx, batch in enumerate(train_loader):
             if step >= config.max_steps:
                 break
 
-            x, y = x.to(device), y.to(device)
+            x, y = unpack_batch(batch, device)
 
             # Forward pass
             if config.use_amp:
