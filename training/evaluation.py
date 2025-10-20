@@ -5,7 +5,7 @@ import math
 from torch.utils.data import DataLoader
 from torch.amp import autocast
 from configs.moe_config import MoEModelConfig
-
+from utils.helpers import unpack_batch
 
 def evaluate_model(model: nn.Module, val_loader: DataLoader, config: MoEModelConfig):
     """Evaluate model performance"""
@@ -17,10 +17,10 @@ def evaluate_model(model: nn.Module, val_loader: DataLoader, config: MoEModelCon
     device = next(model.parameters()).device
 
     with torch.no_grad():
-        for i, (x, y) in enumerate(val_loader):
+        for i, batch in enumerate(val_loader):
             if i >= config.eval_steps:
                 break
-            x, y = x.to(device), y.to(device)
+            x, y = unpack_batch(batch, device)
 
             with autocast('cuda', dtype=torch.float16, enabled=config.use_amp):
                 # MoE model evaluation

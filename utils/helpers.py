@@ -17,3 +17,12 @@ def set_seed(seed: int = 42):
 def count_parameters(model):
     """Count the number of parameters in a model"""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def unpack_batch(batch, device):
+    """Always return (input_ids, labels) no matter what the loader gives us."""
+    if isinstance(batch, dict):
+        return batch["input_ids"].to(device), batch["labels"].to(device)
+    elif isinstance(batch, (list, tuple)):
+        return batch[0].to(device), batch[1].to(device)
+    else:
+        raise TypeError("Unknown batch format")
