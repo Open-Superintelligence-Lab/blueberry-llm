@@ -33,6 +33,7 @@ class MoEModelConfig:
     grad_clip: float = 1.0
 
     # Technical
+    use_flash_muon = True
     use_amp: bool = True
     vocab_size: Optional[int] = None
     log_milestones: Tuple[int, ...] = (2000, 5000, 10000)

@@ -9,7 +9,7 @@ from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 from configs.moe_config import MoEModelConfig
 from models.moe_llm import MoEMinimalLLM
-from optimizers.muon import Muon
+from optimizers import Muon, FlashMuon
 from training.evaluation import evaluate_model
 from utils.helpers import set_seed
 
@@ -30,8 +30,8 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
 
     print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
-
-    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=0.95)
+    MuonCls = FlashMuon if config.use_flash_muon else Muon
+    muon_optimizer = MuonCls(muon_params, lr=config.muon_lr, momentum=0.95)
     adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.muon_lr*0.1, weight_decay=config.weight_decay)
 
     return [muon_optimizer, adamw_optimizer]
