@@ -1,0 +1,3 @@
+[submodule "optimizers/flash-muon"]
+	path = optimizers/flash-muon
+	url = https://github.com/nil0x9/flash-muon.git
