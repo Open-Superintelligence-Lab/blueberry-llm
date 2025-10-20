@@ -6,6 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from torch.amp import autocast, GradScaler
+from functools import partial
 from tqdm import tqdm
 from configs.moe_config import MoEModelConfig
 from models.moe_llm import MoEMinimalLLM
@@ -13,24 +14,23 @@ from optimizers import Muon, FlashMuon
 from training.evaluation import evaluate_model
 from utils.helpers import set_seed
 
+def _is_muon_param(name: str, p: nn.Parameter) -> bool:
+    """Muon rule: 2-D weight matrix, no embeddings, no norm layers."""
+    return (
+        p.ndim == 2
+        and p.requires_grad
+        and "token_embedding" not in name
+        and "norm" not in name
+    )
 
 def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
     """Setup Muon optimizer with hybrid approach"""
-    muon_params = []
-    adamw_params = []
-
-    for name, param in model.named_parameters():
-        if (param.ndim == 2 and 
-            'token_embedding' not in name and 
-            'norm' not in name and 
-            param.requires_grad):
-            muon_params.append(param)
-        else:
-            adamw_params.append(param)
-
+    muon_params, adamw_params = [], []
+    for name, p in model.named_parameters():
+        (muon_params if _is_muon_param(name, p) else adamw_params).append(p)
     print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
-    MuonCls = FlashMuon if config.use_flash_muon else Muon
+    MuonCls = config.use_flash_muon and partial(FlashMuon, world_size=getattr(config, 'world_size', 1), rank=getattr(config, 'rank', 0)) or Muon
     muon_optimizer = MuonCls(muon_params, lr=config.muon_lr, momentum=0.95)
     adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.muon_lr*0.1, weight_decay=config.weight_decay)
 
