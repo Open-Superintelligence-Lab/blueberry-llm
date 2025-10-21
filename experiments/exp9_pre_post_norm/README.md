@@ -27,11 +27,12 @@ python run_experiment.py
 ```
 
 ## Configuration
-- Model: 4-layer MoE Transformer
-- Dimensions: 256 d_model, 4 heads, 1024 d_ff
-- MoE: 4 experts, top-2 routing
-- Training: 500 steps, batch size 8, seq len 256
-- Optimizer: AdamW (lr=3e-4, wd=0.01)
+- Model: 6-layer MoE Transformer
+- Dimensions: 512 d_model, 8 heads, 2048 d_ff
+- MoE: 8 experts, top-2 routing
+- Training: 2000 steps, batch size 8, seq len 512
+- Optimizer: AdamW (lr=3e-4, wd=0.1)
+- Learning Rate: Linear warmup (200 steps) + Cosine decay
 
 ## Results
 Results will be saved to `results/experiment_results.json` with loss curves for both models.
