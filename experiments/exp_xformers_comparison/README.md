@@ -1,26 +1,33 @@
-# XFormers Memory-Efficient Attention Comparison
+# XFormers Attention Comparison Experiment
 
-Simple experiment comparing standard PyTorch attention vs xformers memory-efficient attention.
+This experiment compares the performance of xformers memory-efficient attention vs standard PyTorch scaled_dot_product_attention on the smollm dataset.
 
-## Quick Start
+## Experiment Setup
+
+- **Dataset**: HuggingFaceTB/smollm-corpus (cosmopedia-v2)
+- **Tokenizer**: HuggingFaceTB/SmolLM-135M
+- **Model**: MoE Transformer with current configuration from `configs/moe_config.py`
+
+## Experiments
+
+1. **Standard Attention**: Uses PyTorch `F.scaled_dot_product_attention`
+2. **XFormers Attention**: Uses xformers `memory_efficient_attention`
+
+## Metrics Compared
+
+- Training time (seconds)
+- Validation loss
+- Validation accuracy
+- Validation perplexity
+
+## Running the Experiment
 
 ```bash
-cd /Users/vukrosic/AI\ Science\ Projects/blueberry-llm
+cd /root/blueberry-llm
 python experiments/exp_xformers_comparison/compare_attention.py
 ```
 
-## What It Measures
-
-- **Training Time**: Total time to complete training steps
-- **Peak Memory Usage**: Maximum GPU memory allocated
-- **Final Validation Loss**: Model performance
-- **Speedup**: How much faster (or slower) xformers is
-- **Memory Reduction**: How much memory xformers saves
-
 ## Results
 
-Results are saved to `results/comparison_results.json` with:
-- Individual metrics for each attention type
-- Direct comparison summary
-- Full training/validation loss curves
+Results will be saved to `experiments/exp_xformers_comparison/results/comparison_results.json`
 

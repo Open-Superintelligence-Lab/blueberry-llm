@@ -71,6 +71,8 @@ instance/
 # Sphinx documentation
 docs/_build/
 
+hf_cache/
+
 # PyBuilder
 .pybuilder/
 target/
