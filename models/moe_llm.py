@@ -33,6 +33,7 @@ class MoEMinimalLLM(nn.Module):
                     config.num_experts,
                     config.expert_top_k,
                     config.dropout,
+                    config.use_mem_efficient_attention,
                 )
                 for i in range(config.n_layers)
             ]
