@@ -44,13 +44,21 @@ def evaluate_model(model: nn.Module, val_loader: DataLoader, config: MoEModelCon
             with autocast('cuda', dtype=torch.float16, enabled=config.use_amp):
                 # MoE model evaluation
                 logits = model(x, return_aux_loss=False)  # Don't return aux loss during eval
-                loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
+                # Shift for causal LM: predict next token
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = y[:, 1:].contiguous()
+                loss = F.cross_entropy(
+                    shift_logits.view(-1, config.vocab_size),
+                    shift_labels.view(-1)
+                )
 
-            total_loss += loss.item() * y.numel()
-            total_tokens += y.numel()
+            # Count tokens correctly (we lose one token per sequence due to shifting)
+            num_tokens = shift_labels.numel()
+            total_loss += loss.item() * num_tokens
+            total_tokens += num_tokens
 
-            predictions = logits.argmax(dim=-1)
-            total_correct += (predictions == y).sum().item()
+            predictions = shift_logits.argmax(dim=-1)
+            total_correct += (predictions == shift_labels).sum().item()
 
     avg_loss = total_loss / total_tokens
     accuracy = total_correct / total_tokens

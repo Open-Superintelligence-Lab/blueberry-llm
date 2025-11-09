@@ -116,7 +116,14 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
             if config.use_amp:
                 with autocast('cuda', dtype=torch.float16):
                     logits, aux_loss = model(x, return_aux_loss=True)
-                    ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
+                    # Shift for causal LM: predict next token
+                    # logits[:, :-1] predicts labels[:, 1:]
+                    shift_logits = logits[:, :-1, :].contiguous()
+                    shift_labels = y[:, 1:].contiguous()
+                    ce_loss = F.cross_entropy(
+                        shift_logits.view(-1, config.vocab_size),
+                        shift_labels.view(-1)
+                    )
 
                     # Combine main loss and auxiliary loss
                     total_loss = ce_loss
@@ -127,7 +134,14 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
                 scaler.scale(loss).backward()
             else:
                 logits, aux_loss = model(x, return_aux_loss=True)
-                ce_loss = F.cross_entropy(logits.view(-1, config.vocab_size), y.view(-1))
+                # Shift for causal LM: predict next token
+                # logits[:, :-1] predicts labels[:, 1:]
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = y[:, 1:].contiguous()
+                ce_loss = F.cross_entropy(
+                    shift_logits.view(-1, config.vocab_size),
+                    shift_labels.view(-1)
+                )
 
                 total_loss = ce_loss
                 if aux_loss is not None:

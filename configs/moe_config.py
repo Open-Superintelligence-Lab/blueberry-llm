@@ -15,7 +15,7 @@ class MoEModelConfig:
     kv_lora_rank: int | None = 64
     v_dim: int | None = 128
     batch_size: int = 24
-    max_steps: int = 20
+    max_steps: int = 1000
 
     # Training parameters
     gradient_accumulation_steps: int = 4
