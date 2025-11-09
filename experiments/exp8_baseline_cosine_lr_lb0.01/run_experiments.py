@@ -4,17 +4,25 @@ Run systematic experiments to diagnose validation loss issues
 import argparse
 import json
 import time
+import sys
+import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Add project root and exp8 to path (project_root last so it's checked first)
+script_dir = Path(__file__).resolve().parent
+project_root = script_dir.parent.parent
+sys.path.insert(0, str(script_dir))  # For local configs/training
+sys.path.insert(0, str(project_root))  # For project modules (checked first)
 
 import torch
 from torch.utils.data import DataLoader
 
 from configs.moe_config import MoEModelConfig
 from configs.dataset_config import DataConfig
-from configs.experiment_configs import ExperimentConfig, get_experiment, list_experiments, EXPERIMENTS
-from training.experiment_trainer import train_experiment
+from exp_configs.experiment_configs import ExperimentConfig, get_experiment, list_experiments, EXPERIMENTS
+from exp_training.experiment_trainer import train_experiment
 from utils.helpers import set_seed
 from utils.logger import setup_logging
 
@@ -129,6 +137,9 @@ def run_multiple_experiments(exp_names: list, output_dir: str = "./experiments")
     config = exp_config.to_moe_config(base_config)
     train_loader, val_loader = prepare_data(config)
     
+    # Update base_config with vocab_size for all subsequent experiments
+    base_config.vocab_size = config.vocab_size
+    
     results = {}
     
     for exp_name in exp_names:
@@ -160,8 +171,12 @@ def run_multiple_experiments(exp_names: list, output_dir: str = "./experiments")
             logger.info(f"Experiment '{exp_name}' completed. Final val loss: {metrics['val_loss']:.4f}")
             
         except Exception as e:
+            import traceback
             print(f"\n❌ Experiment '{exp_name}' failed with error: {e}")
+            print("\nFull traceback:")
+            traceback.print_exc()
             logger.error(f"Experiment '{exp_name}' failed: {e}")
+            logger.error(traceback.format_exc())
             continue
     
     # Generate comparison report
@@ -298,8 +313,8 @@ def main():
     )
     parser.add_argument(
         '--output-dir', '-o',
-        default='./experiments',
-        help='Output directory for experiment results (default: ./experiments)'
+        default='.',
+        help='Output directory for experiment results (default: current directory)'
     )
     parser.add_argument(
         '--quick',

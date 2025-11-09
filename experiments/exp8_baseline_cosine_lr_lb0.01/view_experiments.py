@@ -3,8 +3,14 @@ View and analyze experiment results
 """
 import argparse
 import json
+import sys
 from pathlib import Path
-from configs.experiment_configs import list_experiments, EXPERIMENTS
+
+# Add exp8 directory to path for local imports
+script_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(script_dir))
+
+from exp_configs.experiment_configs import list_experiments, EXPERIMENTS
 
 
 def view_results(output_dir: str = "./experiments"):

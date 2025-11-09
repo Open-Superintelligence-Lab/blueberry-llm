@@ -21,7 +21,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(script_dir))
 
 from configs.moe_config import MoEModelConfig
-from configs.experiment_configs import ExperimentConfig
+from exp_configs.experiment_configs import ExperimentConfig
 from models.moe_llm import MoEMinimalLLM
 from optimizers.muon import Muon
 from training.evaluation import evaluate_model

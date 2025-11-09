@@ -34,7 +34,8 @@ Baseline 1000-step MoE training run that identified validation loss inflection i
 ## Files
 
 **Results**: `metrics.json`, `metrics_plot.png`, `val_loss_vs_time.png`  
-**Code**: `run_experiments.py`, `view_experiments.py`, `configs/`, `training/`
+**Code**: `run_experiments.py`, `view_experiments.py`, `exp_configs/`, `exp_training/`  
+**Experiments**: Subdirectories for each experiment run (baseline/, early_stopping/, etc.)
 
 ## Usage
 
