@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchtune.modules import RotaryPositionalEmbeddings
 from .components import MixtureOfExperts
+from xformers.ops import memory_efficient_attention, LowerTriangularMask
 
 
 class Rotary(nn.Module):
@@ -18,8 +19,16 @@ class Rotary(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(
+        self,
+        d_model: int,
+        n_heads: int,
+        max_seq_len: int,
+        dropout: float = 0.1,
+        use_mem_atten: bool = False,
+    ):
         super().__init__()
+        self.mem_atten = use_mem_atten
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_k = d_model // n_heads
@@ -45,9 +54,14 @@ class MultiHeadAttention(nn.Module):
         Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
         K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
 
-        attn_output = F.scaled_dot_product_attention(
-            Q, K, V, is_causal=True, dropout_p=self.dropout if self.training else 0.0
-        )
+        if self.mem_atten:
+            attn_output = memory_efficient_attention(
+                Q, K, V, attn_bias=LowerTriangularMask(), p=self.dropout
+            )
+        else:
+            attn_output = F.scaled_dot_product_attention(
+                Q, K, V, is_causal=True, dropout_p=self.dropout if self.training else 0.0
+            )
         attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_len, self.d_model)
         # attn_output = attn_output.transpose(1, 2).reshape(B, T, self.d_model)
         return self.w_o(attn_output)
@@ -133,6 +147,7 @@ class MoETransformerBlock(nn.Module):
         num_experts: int = 8,
         top_k: int = 2,
         dropout: float = 0.1,
+        use_mem_atten: bool = False,
     ):
         super().__init__()
 
@@ -149,7 +164,9 @@ class MoETransformerBlock(nn.Module):
                 dropout,
             )
         else:
-            self.attention = MultiHeadAttention(d_model, n_heads, max_seq_len, dropout)
+            self.attention = MultiHeadAttention(
+                d_model, n_heads, max_seq_len, dropout, use_mem_atten
+            )
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(d_model, d_ff, num_experts, top_k, dropout)
