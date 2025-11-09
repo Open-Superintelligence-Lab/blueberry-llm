@@ -31,6 +31,9 @@ class DataConfig:
     # Caching
     cache_dir: Optional[str] = "./hf_cache"
     num_proc: Optional[int] = None  # Parallel processing for .map()
+    
+    # Streaming
+    streaming: bool = True  # Stream dataset to avoid downloading everything upfront
 
     # Persistence
     save_to_disk: Optional[str] = None  # path to save preprocessed dataset

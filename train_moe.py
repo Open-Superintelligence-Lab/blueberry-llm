@@ -1,4 +1,5 @@
 import time
+import os
 import torch
 import logging
 from torch.utils.data import DataLoader
@@ -81,6 +82,7 @@ def main():
     logger.info(f"Final metrics: {metrics}")
 
     ckpt_path = "./checkpoints/final_model.pt"
+    os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
     torch.save(
         {"model_state_dict": model.state_dict(),
          "config": config,

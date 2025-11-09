@@ -17,10 +17,29 @@ def evaluate_model(model: nn.Module, val_loader: DataLoader, config: MoEModelCon
     device = next(model.parameters()).device
 
     with torch.no_grad():
-        for i, (x, y) in enumerate(val_loader):
+        for i, batch in enumerate(val_loader):
             if i >= config.eval_steps:
                 break
+
+            if isinstance(batch, dict):
+                x = batch["input_ids"]
+                y = batch["labels"]
+                attention_mask = batch.get("attention_mask")
+            elif isinstance(batch, (list, tuple)):
+                if len(batch) == 3:
+                    x, attention_mask, y = batch
+                elif len(batch) == 2:
+                    x, y = batch
+                    attention_mask = None
+                else:
+                    raise ValueError(f"Unexpected batch structure with {len(batch)} elements.")
+            else:
+                raise TypeError(f"Unsupported batch type: {type(batch)}")
+
             x, y = x.to(device), y.to(device)
+
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(device)
 
             with autocast('cuda', dtype=torch.float16, enabled=config.use_amp):
                 # MoE model evaluation

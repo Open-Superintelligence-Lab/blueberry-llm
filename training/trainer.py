@@ -88,11 +88,29 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
     eval_times = []
 
     while step < config.max_steps:
-        for batch_idx, (x, y) in enumerate(train_loader):
+        for batch_idx, batch in enumerate(train_loader):
             if step >= config.max_steps:
                 break
 
+            if isinstance(batch, dict):
+                x = batch["input_ids"]
+                y = batch["labels"]
+                attention_mask = batch.get("attention_mask")
+            elif isinstance(batch, (list, tuple)):
+                if len(batch) == 3:
+                    x, attention_mask, y = batch
+                elif len(batch) == 2:
+                    x, y = batch
+                    attention_mask = None
+                else:
+                    raise ValueError(f"Unexpected batch structure with {len(batch)} elements.")
+            else:
+                raise TypeError(f"Unsupported batch type: {type(batch)}")
+
             x, y = x.to(device), y.to(device)
+
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(device)
 
             # Forward pass
             if config.use_amp:
