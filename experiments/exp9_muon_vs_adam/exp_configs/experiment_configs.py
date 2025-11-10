@@ -259,7 +259,7 @@ EXPERIMENTS = {
     
     "adam_baseline": ExperimentConfig(
         name="adam_baseline",
-        description="Pure Adam: AdamW for all parameters",
+        description="Pure Adam: AdamW for all parameters - LR 0.001 (optimal)",
         optimizer_type="adam",
         max_steps=500,
         use_lr_schedule=True,
@@ -267,6 +267,83 @@ EXPERIMENTS = {
         adam_lr=0.001,
         load_balancing_weight=0.01,
         use_early_stopping=False,
+    ),
+    
+    # Adam experiments with optimal LR
+    "adam_optimal": ExperimentConfig(
+        name="adam_optimal",
+        description="Optimal Adam: LR=0.001 (best discovered settings)",
+        optimizer_type="adam",
+        max_steps=500,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        adam_lr=0.001,
+        load_balancing_weight=0.01,
+        use_early_stopping=False,
+    ),
+    
+    "adam_optimal_wd_0.05": ExperimentConfig(
+        name="adam_optimal_wd_0.05",
+        description="Adam optimal with lower weight decay (0.05)",
+        optimizer_type="adam",
+        max_steps=500,
+        adam_lr=0.001,
+        weight_decay=0.05,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "adam_optimal_wd_0.2": ExperimentConfig(
+        name="adam_optimal_wd_0.2",
+        description="Adam optimal with higher weight decay (0.2)",
+        optimizer_type="adam",
+        max_steps=500,
+        adam_lr=0.001,
+        weight_decay=0.2,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "adam_no_warmup": ExperimentConfig(
+        name="adam_no_warmup",
+        description="Adam optimal with no warmup",
+        optimizer_type="adam",
+        max_steps=500,
+        adam_lr=0.001,
+        warmup_steps_ratio=0.0,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "adam_warmup_0.1": ExperimentConfig(
+        name="adam_warmup_0.1",
+        description="Adam optimal with longer warmup (10%)",
+        optimizer_type="adam",
+        max_steps=500,
+        adam_lr=0.001,
+        warmup_steps_ratio=0.1,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "adam_linear_decay": ExperimentConfig(
+        name="adam_linear_decay",
+        description="Adam optimal with linear decay schedule",
+        optimizer_type="adam",
+        max_steps=500,
+        adam_lr=0.001,
+        use_lr_schedule=True,
+        lr_schedule_type="linear_decay",
+    ),
+    
+    "adam_constant_lr_optimal": ExperimentConfig(
+        name="adam_constant_lr_optimal",
+        description="Adam with constant LR (no schedule)",
+        optimizer_type="adam",
+        max_steps=500,
+        adam_lr=0.001,
+        use_lr_schedule=False,
+        lr_schedule_type="constant",
     ),
     
     "adam_higher_lr": ExperimentConfig(
@@ -329,6 +406,132 @@ EXPERIMENTS = {
         adam_lr=0.001,
         load_balancing_weight=0.01,
         use_early_stopping=False,
+    ),
+    
+    # ============================================================================
+    # ADAM LEARNING RATE SWEEP
+    # ============================================================================
+    
+    # Fast 200-step LR sweep for Adam
+    "adam_lr_0.0001_fast": ExperimentConfig(
+        name="adam_lr_0.0001_fast",
+        description="[FAST] Adam LR 0.0001 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.0001,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.0002_fast": ExperimentConfig(
+        name="adam_lr_0.0002_fast",
+        description="[FAST] Adam LR 0.0002 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.0002,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.0003_fast": ExperimentConfig(
+        name="adam_lr_0.0003_fast",
+        description="[FAST] Adam LR 0.0003 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.0003,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.0005_fast": ExperimentConfig(
+        name="adam_lr_0.0005_fast",
+        description="[FAST] Adam LR 0.0005 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.0005,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.0007_fast": ExperimentConfig(
+        name="adam_lr_0.0007_fast",
+        description="[FAST] Adam LR 0.0007 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.0007,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.001_fast": ExperimentConfig(
+        name="adam_lr_0.001_fast",
+        description="[FAST] Adam LR 0.001 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.001,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.002_fast": ExperimentConfig(
+        name="adam_lr_0.002_fast",
+        description="[FAST] Adam LR 0.002 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.002,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.003_fast": ExperimentConfig(
+        name="adam_lr_0.003_fast",
+        description="[FAST] Adam LR 0.003 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.003,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.005_fast": ExperimentConfig(
+        name="adam_lr_0.005_fast",
+        description="[FAST] Adam LR 0.005 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.005,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.007_fast": ExperimentConfig(
+        name="adam_lr_0.007_fast",
+        description="[FAST] Adam LR 0.007 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.007,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "adam_lr_0.01_fast": ExperimentConfig(
+        name="adam_lr_0.01_fast",
+        description="[FAST] Adam LR 0.01 (200 steps)",
+        optimizer_type="adam",
+        max_steps=200,
+        adam_lr=0.01,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
     ),
     
     # ============================================================================

@@ -182,7 +182,7 @@ When analyzing results, consider:
 
 ## Results
 
-### Learning Rate Sweep (200 steps, fast iteration)
+### Muon Learning Rate Sweep (200 steps, fast iteration)
 
 **Winner: LR=0.07** 🏆
 
@@ -202,6 +202,32 @@ When analyzing results, consider:
 - Sweet spot around 0.06-0.08, with 0.07 being optimal
 - **~5% improvement** over the standard 0.03 LR
 - All experiments now use LR=0.07 as the baseline
+
+### Adam Learning Rate Sweep (200 steps, fast iteration)
+
+**Winner: LR=0.001** 🏆
+
+| Experiment | LR | Best Loss | Final Loss | Final Acc |
+|------------|-----|-----------|------------|-----------|
+| **adam_lr_0.001_fast** | 0.001 | **6.7262** | 6.7262 | 0.1518 | 🏆
+| adam_lr_0.0007_fast | 0.0007 | 6.8148 | 6.8148 | 0.1495 |
+| adam_lr_0.002_fast | 0.002 | 6.8494 | 6.8494 | 0.1207 |
+| adam_lr_0.003_fast | 0.003 | 6.9987 | 6.9987 | 0.1096 |
+| adam_lr_0.0005_fast | 0.0005 | 7.0318 | 7.0318 | 0.1331 |
+| adam_lr_0.0003_fast | 0.0003 | 7.3329 | 7.3329 | 0.1116 |
+| adam_lr_0.005_fast | 0.005 | 7.3445 | 7.3445 | 0.0899 |
+| adam_lr_0.007_fast | 0.007 | 7.4220 | 7.4220 | 0.0814 |
+| adam_lr_0.01_fast | 0.01 | 7.4575 | 7.4575 | 0.0894 |
+| adam_lr_0.0002_fast | 0.0002 | 7.6188 | 7.6188 | 0.0997 |
+| adam_lr_0.0001_fast | 0.0001 | 8.5076 | 8.5076 | 0.0896 |
+
+**Key Findings:**
+- Adam's optimal LR is **0.001** (the standard default)
+- Performance degrades significantly with higher LRs (>0.002)
+- Performance also degrades with lower LRs (<0.0007)
+- Adam is **much more sensitive to LR** than Muon
+- Adam can only tolerate LRs up to ~0.002, while Muon works well at 0.07!
+- At 200 steps with optimal LRs: Muon (5.72) vs Adam (6.73) - **Muon is 15% better**
 
 ### Momentum Sweep (500 steps, LR=0.07)
 
@@ -255,6 +281,8 @@ This achieves **validation loss of 5.1875** in 500 steps (~2 minutes on GPU).
 
 **🎯 Key Result: Muon is 10.32% better than Adam!**
 
+**Note:** This comparison used non-optimized Adam (LR=0.001 was default baseline at 500 steps giving loss 5.7517). After discovering Adam's optimal LR is indeed 0.001 at 200 steps (loss 6.7262), we confirmed Adam was already well-tuned.
+
 ### Final Optimal Configuration
 
 After comprehensive testing, the **absolute best Muon configuration** is:
@@ -273,9 +301,19 @@ Warmup: Important! (no warmup hurts performance)
 **Adam Baseline: 5.7517** (validation loss)
 **Improvement: 10.32%**
 
+### Comparison at Optimal Settings
+
+| Metric | Muon (Optimal) | Adam (Optimal) | Difference |
+|--------|----------------|----------------|------------|
+| **Optimal LR** | 0.07 | 0.001 | **70x higher** |
+| **Best Loss (200 steps)** | 5.72 | 6.73 | **15% better** |
+| **Best Loss (500 steps)** | 5.16 | 5.75 | **10.3% better** |
+| **LR Tolerance** | 0.02-0.09 | 0.0007-0.002 | **~30x wider** |
+| **Training Speed** | ~2.0 min/500 steps | ~1.8 min/500 steps | Similar |
+
 ### Key Insights Discovered
 
-1. **Muon Significantly Outperforms Adam**: 10.32% better validation loss with optimized settings
+1. **Muon Significantly Outperforms Adam**: 10-15% better validation loss with optimized settings
 
 2. **Learning Rate**: 
    - Muon needs **much higher LRs** than Adam (0.07 vs 0.001)
@@ -384,10 +422,22 @@ warmup_ratio = 0.05
 
 ### Files and Resources
 
-- **Script to reproduce**: `run_optimal_muon_suite.py`
-- **Results directory**: `optimal_muon_suite_results/`
-- **Comparison plots**: `comparison_plot.png`
-- **All configs**: `exp_configs/experiment_configs.py`
+**Muon Experiments:**
+- `run_optimal_muon_suite.py` - Complete Muon optimization suite
+- `optimal_muon_suite_results/` - Muon results directory
+
+**Adam Experiments:**
+- `run_adam_lr_sweep.py` - Adam learning rate sweep  
+- `run_adam_optimization_suite.py` - Adam optimization suite
+- `adam_lr_sweep_results/` - Adam LR sweep results
+- `adam_optimization_results/` - Adam optimization results
+
+**Configuration:**
+- `exp_configs/experiment_configs.py` - All experiment configs
+
+**Comparison:**
+- `comparison_plot.png` - Visual comparison
+- `comparison_summary.json` - Numerical results
 
 ---
 
