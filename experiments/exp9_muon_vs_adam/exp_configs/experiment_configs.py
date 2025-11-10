@@ -111,6 +111,152 @@ EXPERIMENTS = {
         use_early_stopping=False,
     ),
     
+    "muon_optimal": ExperimentConfig(
+        name="muon_optimal",
+        description="Optimal Muon: LR=0.07, momentum=0.9 (best discovered settings)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        load_balancing_weight=0.01,
+        use_early_stopping=False,
+    ),
+    
+    # Test if we can push LR higher with optimal momentum
+    "muon_lr_0.09_momentum_0.9": ExperimentConfig(
+        name="muon_lr_0.09_momentum_0.9",
+        description="Test higher LR (0.09) with optimal momentum (0.9)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.09,
+        adamw_lr=0.009,
+        muon_momentum=0.9,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.1_momentum_0.9": ExperimentConfig(
+        name="muon_lr_0.1_momentum_0.9",
+        description="Test very high LR (0.1) with optimal momentum (0.9)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.1,
+        adamw_lr=0.01,
+        muon_momentum=0.9,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # Fine-tune momentum around 0.9
+    "muon_momentum_0.85": ExperimentConfig(
+        name="muon_momentum_0.85",
+        description="Lower momentum (0.85) with optimal LR (0.07)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.85,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_momentum_0.92": ExperimentConfig(
+        name="muon_momentum_0.92",
+        description="Higher momentum (0.92) with optimal LR (0.07)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.92,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # Test different NS steps with optimal settings
+    "muon_optimal_ns3": ExperimentConfig(
+        name="muon_optimal_ns3",
+        description="Optimal settings (LR=0.07, mom=0.9) with fewer NS steps (3)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        muon_ns_steps=3,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_optimal_ns10": ExperimentConfig(
+        name="muon_optimal_ns10",
+        description="Optimal settings (LR=0.07, mom=0.9) with more NS steps (10)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        muon_ns_steps=10,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # Test without Nesterov momentum
+    "muon_optimal_no_nesterov": ExperimentConfig(
+        name="muon_optimal_no_nesterov",
+        description="Optimal settings (LR=0.07, mom=0.9) without Nesterov momentum",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        muon_nesterov=False,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # Test weight decay variations
+    "muon_optimal_wd_0.05": ExperimentConfig(
+        name="muon_optimal_wd_0.05",
+        description="Optimal settings with lower weight decay (0.05)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        weight_decay=0.05,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_optimal_wd_0.2": ExperimentConfig(
+        name="muon_optimal_wd_0.2",
+        description="Optimal settings with higher weight decay (0.2)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        weight_decay=0.2,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # Long training with optimal settings
+    "muon_optimal_long": ExperimentConfig(
+        name="muon_optimal_long",
+        description="Optimal settings (LR=0.07, mom=0.9) with long training (1000 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=1000,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=20,
+    ),
+    
     "adam_baseline": ExperimentConfig(
         name="adam_baseline",
         description="Pure Adam: AdamW for all parameters",
