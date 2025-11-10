@@ -6,6 +6,7 @@ import json
 import time
 import sys
 import os
+import random
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,6 +53,7 @@ def prepare_data(config: MoEModelConfig):
     
     # Take samples and split into train/val
     raw_samples = list(raw_dataset.take(data_cfg.num_samples))
+    random.shuffle(raw_samples)
     num_val = int(len(raw_samples) * 0.1)
     num_train = len(raw_samples) - num_val
     
