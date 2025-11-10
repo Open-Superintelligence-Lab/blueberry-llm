@@ -4,6 +4,9 @@ import torch
 import logging
 from torch.utils.data import DataLoader
 
+# Fix tokenizer parallelism warning when using DataLoader workers
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from configs.moe_config import MoEModelConfig
 from configs.dataset_config import DataConfig
 from data.loader import prepare_lm_dataset

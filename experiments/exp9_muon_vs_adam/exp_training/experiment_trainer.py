@@ -83,8 +83,21 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig, exp_config: E
     print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
-    muon_optimizer = Muon(muon_params, lr=exp_config.muon_lr, momentum=0.95)
-    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=exp_config.adamw_lr, weight_decay=config.weight_decay)
+    muon_optimizer = Muon(
+        muon_params, 
+        lr=exp_config.muon_lr, 
+        momentum=exp_config.muon_momentum,
+        nesterov=exp_config.muon_nesterov,
+        ns_steps=exp_config.muon_ns_steps
+    )
+    adamw_optimizer = torch.optim.AdamW(
+        adamw_params, 
+        lr=exp_config.adamw_lr, 
+        weight_decay=config.weight_decay
+    )
+    
+    print(f"  Muon config: LR={exp_config.muon_lr}, momentum={exp_config.muon_momentum}, "
+          f"nesterov={exp_config.muon_nesterov}, ns_steps={exp_config.muon_ns_steps}")
 
     return [muon_optimizer, adamw_optimizer]
 
@@ -228,7 +241,24 @@ def train_experiment(
         'use_early_stopping': exp_config.use_early_stopping,
         'load_balancing_weight': exp_config.load_balancing_weight,
         'dropout': exp_config.dropout,
+        'warmup_steps_ratio': exp_config.warmup_steps_ratio,
+        'min_lr_ratio': exp_config.min_lr_ratio,
+        'grad_clip': exp_config.grad_clip,
     }
+    
+    # Add optimizer-specific config
+    if exp_config.optimizer_type in ["muon", "muon_hybrid"]:
+        extra_config.update({
+            'muon_lr': exp_config.muon_lr,
+            'adamw_lr': exp_config.adamw_lr,
+            'muon_momentum': exp_config.muon_momentum,
+            'muon_nesterov': exp_config.muon_nesterov,
+            'muon_ns_steps': exp_config.muon_ns_steps,
+        })
+    elif exp_config.optimizer_type == "adam":
+        extra_config.update({
+            'adam_lr': exp_config.adam_lr,
+        })
 
     # Custom plotting function that includes experiment info
     def plot_fn(metrics_history, output_path):

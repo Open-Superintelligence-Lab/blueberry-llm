@@ -30,6 +30,11 @@ class ExperimentConfig:
     adam_lr: float = 0.001
     adamw_lr: float = 0.001  # For embeddings/norms in hybrid mode
     
+    # Muon-specific hyperparameters
+    muon_momentum: float = 0.95
+    muon_nesterov: bool = True
+    muon_ns_steps: int = 5  # Newton-Schulz iteration steps
+    
     # Early stopping
     use_early_stopping: bool = False
     early_stopping_patience: int = 50  # Number of eval steps to wait
@@ -95,13 +100,13 @@ class ExperimentConfig:
 EXPERIMENTS = {
     "muon_baseline": ExperimentConfig(
         name="muon_baseline",
-        description="Baseline: Hybrid Muon (2D weights) + AdamW (embeddings/norms)",
+        description="Baseline: Hybrid Muon (2D weights) + AdamW (embeddings/norms) - LR 0.07 (optimized)",
         optimizer_type="muon_hybrid",
         max_steps=500,
         use_lr_schedule=True,
         lr_schedule_type="cosine",
-        muon_lr=0.01,
-        adamw_lr=0.001,
+        muon_lr=0.07,
+        adamw_lr=0.007,
         load_balancing_weight=0.01,
         use_early_stopping=False,
     ),
@@ -144,26 +149,26 @@ EXPERIMENTS = {
     
     "muon_only": ExperimentConfig(
         name="muon_only",
-        description="Pure Muon: Muon for all 2D parameters, minimal AdamW",
+        description="Pure Muon: Muon for all 2D parameters, minimal AdamW - LR 0.07",
         optimizer_type="muon_hybrid",
         max_steps=500,
         use_lr_schedule=True,
         lr_schedule_type="cosine",
-        muon_lr=0.02,
-        adamw_lr=0.001,
+        muon_lr=0.07,
+        adamw_lr=0.007,
         load_balancing_weight=0.01,
         use_early_stopping=False,
     ),
     
     "muon_constant_lr": ExperimentConfig(
         name="muon_constant_lr",
-        description="Muon with constant learning rate (no schedule)",
+        description="Muon with constant learning rate (no schedule) - LR 0.07",
         optimizer_type="muon_hybrid",
         max_steps=500,
         use_lr_schedule=False,
         lr_schedule_type="constant",
-        muon_lr=0.01,
-        adamw_lr=0.001,
+        muon_lr=0.07,
+        adamw_lr=0.007,
         load_balancing_weight=0.01,
         use_early_stopping=False,
     ),
@@ -178,6 +183,525 @@ EXPERIMENTS = {
         adam_lr=0.001,
         load_balancing_weight=0.01,
         use_early_stopping=False,
+    ),
+    
+    # ============================================================================
+    # MUON-SPECIFIC EXPERIMENTS
+    # ============================================================================
+    
+    # 1. Learning Rate Sweep for Muon
+    "muon_lr_0.005": ExperimentConfig(
+        name="muon_lr_0.005",
+        description="Muon with lower LR (0.005)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.005,
+        adamw_lr=0.0005,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.015": ExperimentConfig(
+        name="muon_lr_0.015",
+        description="Muon with higher LR (0.015)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.015,
+        adamw_lr=0.0015,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.02": ExperimentConfig(
+        name="muon_lr_0.02",
+        description="Muon with high LR (0.02)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.02,
+        adamw_lr=0.002,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.03": ExperimentConfig(
+        name="muon_lr_0.03",
+        description="Muon with very high LR (0.03)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.03,
+        adamw_lr=0.003,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.04": ExperimentConfig(
+        name="muon_lr_0.04",
+        description="Muon with very high LR (0.04)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.04,
+        adamw_lr=0.004,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.05": ExperimentConfig(
+        name="muon_lr_0.05",
+        description="Muon with very high LR (0.05)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.05,
+        adamw_lr=0.005,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.06": ExperimentConfig(
+        name="muon_lr_0.06",
+        description="Muon with extremely high LR (0.06)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.06,
+        adamw_lr=0.006,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.07": ExperimentConfig(
+        name="muon_lr_0.07",
+        description="Muon with extremely high LR (0.07)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.08": ExperimentConfig(
+        name="muon_lr_0.08",
+        description="Muon with extremely high LR (0.08)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.08,
+        adamw_lr=0.008,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_lr_0.1": ExperimentConfig(
+        name="muon_lr_0.1",
+        description="Muon with ultra high LR (0.1)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.1,
+        adamw_lr=0.01,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # Fast 200-step LR sweep for quick iteration
+    "muon_lr_0.02_fast": ExperimentConfig(
+        name="muon_lr_0.02_fast",
+        description="[FAST] Muon LR 0.02 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.02,
+        adamw_lr=0.002,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.03_fast": ExperimentConfig(
+        name="muon_lr_0.03_fast",
+        description="[FAST] Muon LR 0.03 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.03,
+        adamw_lr=0.003,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.04_fast": ExperimentConfig(
+        name="muon_lr_0.04_fast",
+        description="[FAST] Muon LR 0.04 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.04,
+        adamw_lr=0.004,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.05_fast": ExperimentConfig(
+        name="muon_lr_0.05_fast",
+        description="[FAST] Muon LR 0.05 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.05,
+        adamw_lr=0.005,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.06_fast": ExperimentConfig(
+        name="muon_lr_0.06_fast",
+        description="[FAST] Muon LR 0.06 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.06,
+        adamw_lr=0.006,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.07_fast": ExperimentConfig(
+        name="muon_lr_0.07_fast",
+        description="[FAST] Muon LR 0.07 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.08_fast": ExperimentConfig(
+        name="muon_lr_0.08_fast",
+        description="[FAST] Muon LR 0.08 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.08,
+        adamw_lr=0.008,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.1_fast": ExperimentConfig(
+        name="muon_lr_0.1_fast",
+        description="[FAST] Muon LR 0.1 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.1,
+        adamw_lr=0.01,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.12_fast": ExperimentConfig(
+        name="muon_lr_0.12_fast",
+        description="[FAST] Muon LR 0.12 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.12,
+        adamw_lr=0.012,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    "muon_lr_0.15_fast": ExperimentConfig(
+        name="muon_lr_0.15_fast",
+        description="[FAST] Muon LR 0.15 (200 steps)",
+        optimizer_type="muon_hybrid",
+        max_steps=200,
+        muon_lr=0.15,
+        adamw_lr=0.015,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=10,
+    ),
+    
+    # 2. Momentum Variations (with optimized LR=0.07)
+    "muon_momentum_0.9": ExperimentConfig(
+        name="muon_momentum_0.9",
+        description="Muon with lower momentum (0.9) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.9,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_momentum_0.97": ExperimentConfig(
+        name="muon_momentum_0.97",
+        description="Muon with higher momentum (0.97) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.97,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_momentum_0.99": ExperimentConfig(
+        name="muon_momentum_0.99",
+        description="Muon with very high momentum (0.99) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_momentum=0.99,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 3. Newton-Schulz Iteration Steps (with optimized LR=0.07)
+    "muon_ns_steps_3": ExperimentConfig(
+        name="muon_ns_steps_3",
+        description="Muon with fewer NS iterations (3 steps) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_ns_steps=3,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_ns_steps_7": ExperimentConfig(
+        name="muon_ns_steps_7",
+        description="Muon with more NS iterations (7 steps) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_ns_steps=7,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_ns_steps_10": ExperimentConfig(
+        name="muon_ns_steps_10",
+        description="Muon with many NS iterations (10 steps) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_ns_steps=10,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 4. Nesterov Momentum On/Off (with optimized LR=0.07)
+    "muon_no_nesterov": ExperimentConfig(
+        name="muon_no_nesterov",
+        description="Muon without Nesterov momentum - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        muon_nesterov=False,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 5. Warmup Variations (with optimized LR=0.07)
+    "muon_no_warmup": ExperimentConfig(
+        name="muon_no_warmup",
+        description="Muon with no warmup - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        warmup_steps_ratio=0.0,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_warmup_0.1": ExperimentConfig(
+        name="muon_warmup_0.1",
+        description="Muon with longer warmup (10% of steps) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        warmup_steps_ratio=0.1,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_warmup_0.2": ExperimentConfig(
+        name="muon_warmup_0.2",
+        description="Muon with very long warmup (20% of steps) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        warmup_steps_ratio=0.2,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 6. LR Schedule Comparisons (with optimized LR=0.07)
+    "muon_linear_decay": ExperimentConfig(
+        name="muon_linear_decay",
+        description="Muon with linear decay schedule - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        use_lr_schedule=True,
+        lr_schedule_type="linear_decay",
+    ),
+    
+    "muon_step_decay": ExperimentConfig(
+        name="muon_step_decay",
+        description="Muon with step decay schedule - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        use_lr_schedule=True,
+        lr_schedule_type="step",
+    ),
+    
+    # 7. Hybrid Ratio Experiments (Muon vs AdamW LR)
+    "muon_adamw_ratio_20": ExperimentConfig(
+        name="muon_adamw_ratio_20",
+        description="Muon with 20x higher LR than AdamW",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.02,
+        adamw_lr=0.001,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_adamw_ratio_5": ExperimentConfig(
+        name="muon_adamw_ratio_5",
+        description="Muon with 5x higher LR than AdamW",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.005,
+        adamw_lr=0.001,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_adamw_equal_lr": ExperimentConfig(
+        name="muon_adamw_equal_lr",
+        description="Muon with equal LR to AdamW",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.001,
+        adamw_lr=0.001,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 8. Gradient Clipping Variations
+    "muon_grad_clip_0.5": ExperimentConfig(
+        name="muon_grad_clip_0.5",
+        description="Muon with aggressive gradient clipping (0.5)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.01,
+        adamw_lr=0.001,
+        grad_clip=0.5,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_grad_clip_2.0": ExperimentConfig(
+        name="muon_grad_clip_2.0",
+        description="Muon with relaxed gradient clipping (2.0)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.01,
+        adamw_lr=0.001,
+        grad_clip=2.0,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_no_grad_clip": ExperimentConfig(
+        name="muon_no_grad_clip",
+        description="Muon without gradient clipping",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.01,
+        adamw_lr=0.001,
+        grad_clip=1e6,  # Effectively no clipping
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 9. Combined Best Settings
+    "muon_aggressive": ExperimentConfig(
+        name="muon_aggressive",
+        description="Muon with aggressive settings (high LR, high momentum, long warmup)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.03,
+        adamw_lr=0.003,
+        muon_momentum=0.99,
+        warmup_steps_ratio=0.1,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_conservative": ExperimentConfig(
+        name="muon_conservative",
+        description="Muon with conservative settings (low LR, low momentum, short warmup)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.005,
+        adamw_lr=0.0005,
+        muon_momentum=0.9,
+        warmup_steps_ratio=0.02,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    # 10. Longer Training (with optimized LR=0.07)
+    "muon_long_training": ExperimentConfig(
+        name="muon_long_training",
+        description="Muon with longer training (1000 steps) - LR 0.07",
+        optimizer_type="muon_hybrid",
+        max_steps=1000,
+        muon_lr=0.07,
+        adamw_lr=0.007,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+        eval_every=20,
+    ),
+    
+    # 11. Minimum LR Variations
+    "muon_min_lr_0.01": ExperimentConfig(
+        name="muon_min_lr_0.01",
+        description="Muon with higher minimum LR (1% of peak)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.01,
+        adamw_lr=0.001,
+        min_lr_ratio=0.01,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
+    ),
+    
+    "muon_min_lr_0.5": ExperimentConfig(
+        name="muon_min_lr_0.5",
+        description="Muon with high minimum LR (50% of peak)",
+        optimizer_type="muon_hybrid",
+        max_steps=500,
+        muon_lr=0.01,
+        adamw_lr=0.001,
+        min_lr_ratio=0.5,
+        use_lr_schedule=True,
+        lr_schedule_type="cosine",
     ),
 }
 
@@ -203,7 +727,10 @@ def list_experiments():
             print(f"  - Adam LR: {config.adam_lr}")
         elif config.optimizer_type == "muon_hybrid":
             print(f"  - Muon LR: {config.muon_lr}, AdamW LR: {config.adamw_lr}")
+            print(f"  - Muon momentum: {config.muon_momentum}, Nesterov: {config.muon_nesterov}, NS steps: {config.muon_ns_steps}")
         print(f"  - LR schedule: {config.lr_schedule_type if config.use_lr_schedule else 'none'}")
+        print(f"  - Warmup ratio: {config.warmup_steps_ratio}, Min LR ratio: {config.min_lr_ratio}")
+        print(f"  - Grad clip: {config.grad_clip}")
         print(f"  - Load balancing weight: {config.load_balancing_weight}")
         print(f"  - Early stopping: {config.use_early_stopping}")
 
