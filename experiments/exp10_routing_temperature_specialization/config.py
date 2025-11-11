@@ -18,7 +18,7 @@ class TemperatureConfig:
     temperature_end: Optional[float] = None
     
     # Training settings (inherit from MoEModelConfig defaults)
-    max_steps: int = 500
+    max_steps: int = 500  # Full training
     
     def get_temperature_at_step(self, step: int) -> float:
         """Calculate temperature at given training step"""
@@ -139,7 +139,7 @@ EXTENDED_TRAINING = {
         name="temp_best_long",
         description="Best temperature from ablation, trained for 1000 steps",
         temperature=2.0,  # Will be updated after ablation
-        max_steps=1000,
+        max_steps=1000,  # Extended training
     ),
 }
 
@@ -181,6 +181,6 @@ def list_experiments():
         print(f"  {name:20s} - Temp: {config.temperature:5.1f} - {config.description}")
     
     print("\n" + "="*80)
-    print(f"Total: {len(ALL_EXPERIMENTS)} experiments")
+    print(f"Total: {len(ALL_EXPERIMENTS)} experiments (~3-4 min each @ 500 steps)")
     print("="*80 + "\n")
 

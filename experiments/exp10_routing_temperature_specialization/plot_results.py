@@ -71,7 +71,7 @@ def plot_temperature_comparison(results: Dict, output_dir: Path):
     
     # Plot 3: Final Performance vs Temperature
     ax3 = fig.add_subplot(gs[1, 0])
-    final_losses = [r[1]['final_metrics']['loss'] for r in sorted_results]
+    final_losses = [r[1]['final_metrics']['val_loss'] for r in sorted_results]
     best_losses = [min(r[1]['history']['val_losses']) for r in sorted_results]
     ax3.plot(temps, final_losses, 'o-', color='darkred', linewidth=2, markersize=8, label='Final Loss')
     ax3.plot(temps, best_losses, 's-', color='darkblue', linewidth=2, markersize=8, label='Best Loss')
@@ -84,7 +84,7 @@ def plot_temperature_comparison(results: Dict, output_dir: Path):
     
     # Plot 4: Validation Accuracy vs Temperature
     ax4 = fig.add_subplot(gs[1, 1])
-    final_accs = [r[1]['final_metrics']['accuracy'] for r in sorted_results]
+    final_accs = [r[1]['final_metrics']['val_accuracy'] for r in sorted_results]
     ax4.plot(temps, final_accs, 'o-', color='darkgreen', linewidth=2, markersize=8)
     ax4.set_xlabel('Temperature', fontsize=12)
     ax4.set_ylabel('Validation Accuracy', fontsize=12)
@@ -353,8 +353,8 @@ def plot_schedule_comparison(results: Dict, output_dir: Path):
     # Plot 4: Final Metrics Comparison
     ax = axes[1, 1]
     schedule_names = list(schedule_results.keys())
-    final_losses = [data['final_metrics']['loss'] for data in schedule_results.values()]
-    final_accs = [data['final_metrics']['accuracy'] for data in schedule_results.values()]
+    final_losses = [data['final_metrics']['val_loss'] for data in schedule_results.values()]
+    final_accs = [data['final_metrics']['val_accuracy'] for data in schedule_results.values()]
     
     x = np.arange(len(schedule_names))
     width = 0.35
@@ -406,8 +406,8 @@ def generate_summary_report(results: Dict, output_dir: Path):
             'experiment': best_name,
             'temperature': best_data['temperature'],
             'best_loss': min(best_data['history']['val_losses']),
-            'final_loss': best_data['final_metrics']['loss'],
-            'final_accuracy': best_data['final_metrics']['accuracy'],
+            'final_loss': best_data['final_metrics']['val_loss'],
+            'final_accuracy': best_data['final_metrics']['val_accuracy'],
         }
         
         # Temperature analysis
@@ -433,8 +433,8 @@ def generate_summary_report(results: Dict, output_dir: Path):
             'experiment': best_name,
             'schedule_type': best_data['temperature_schedule'],
             'best_loss': min(best_data['history']['val_losses']),
-            'final_loss': best_data['final_metrics']['loss'],
-            'final_accuracy': best_data['final_metrics']['accuracy'],
+            'final_loss': best_data['final_metrics']['val_loss'],
+            'final_accuracy': best_data['final_metrics']['val_accuracy'],
         }
         
         schedule_losses = {k: min(v['history']['val_losses']) 

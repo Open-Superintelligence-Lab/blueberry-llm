@@ -1,0 +1,35 @@
+{
+  "experiment_overview": {
+    "total_experiments": 3,
+    "experiment_names": [
+      "temp_0.7",
+      "temp_1.0",
+      "temp_2.0"
+    ]
+  },
+  "best_results": {
+    "temperature_ablation": {
+      "experiment": "temp_0.7",
+      "temperature": 0.7,
+      "best_loss": 10.933640250890077,
+      "final_loss": 14.585194446172816,
+      "final_accuracy": 0.01640931313229101
+    }
+  },
+  "temperature_analysis": {
+    "tested_temperatures": [
+      0.7,
+      1.0,
+      2.0
+    ],
+    "losses": [
+      10.933640250890077,
+      10.93908197382735,
+      10.947579276014132
+    ],
+    "best_temperature": 0.7,
+    "worst_temperature": 2.0,
+    "improvement": 0.12732518096118828
+  },
+  "schedule_analysis": {}
+}

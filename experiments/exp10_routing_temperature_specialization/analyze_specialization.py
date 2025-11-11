@@ -229,8 +229,8 @@ def generate_specialization_report(results: Dict, output_dir: Path):
         
         analysis = {
             'temperature': data['temperature'],
-            'final_loss': data['final_metrics']['loss'],
-            'final_accuracy': data['final_metrics']['accuracy'],
+            'final_loss': data['final_metrics']['val_loss'],
+            'final_accuracy': data['final_metrics']['val_accuracy'],
         }
         
         # Analyze expert utilization
@@ -261,11 +261,11 @@ def generate_specialization_report(results: Dict, output_dir: Path):
     
     # Generate insights
     if temp_results:
-        best_exp = min(temp_results.items(), key=lambda x: x[1]['final_metrics']['loss'])
+        best_exp = min(temp_results.items(), key=lambda x: x[1]['final_metrics']['val_loss'])
         report['summary']['best_temperature'] = {
             'experiment': best_exp[0],
             'temperature': best_exp[1]['temperature'],
-            'loss': best_exp[1]['final_metrics']['loss'],
+            'loss': best_exp[1]['final_metrics']['val_loss'],
         }
         
         # Find most balanced utilization

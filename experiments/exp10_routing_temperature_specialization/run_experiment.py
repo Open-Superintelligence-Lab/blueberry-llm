@@ -189,8 +189,8 @@ def run_multiple_experiments(exp_names: list, output_dir: str = "./results"):
             results[exp_name] = result
             
             print(f"\n✅ Experiment '{exp_name}' completed successfully")
-            print(f"   Final loss: {result['final_metrics']['loss']:.4f}")
-            print(f"   Final accuracy: {result['final_metrics']['accuracy']:.4f}")
+            print(f"   Final loss: {result['final_metrics']['val_loss']:.4f}")
+            print(f"   Final accuracy: {result['final_metrics']['val_accuracy']:.4f}")
             
         except Exception as e:
             import traceback

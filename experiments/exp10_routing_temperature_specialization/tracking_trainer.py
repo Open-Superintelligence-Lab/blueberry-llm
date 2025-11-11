@@ -34,25 +34,29 @@ def setup_optimizer(model: nn.Module, config: MoEModelConfig):
             else:
                 adamw_params.append(param)
     
-    # Create Muon optimizer (handles both param groups internally)
-    optimizer = Muon(
-        muon_params=muon_params,
+    # Create two separate optimizers
+    muon_optimizer = Muon(
+        muon_params,
         lr=config.muon_lr,
         momentum=config.muon_momentum,
         nesterov=True,
         ns_steps=5,
-        adamw_params=adamw_params,
-        adamw_lr=config.adamw_lr,
-        adamw_betas=(0.9, 0.95),
-        adamw_eps=1e-8,
-        adamw_wd=config.weight_decay,
     )
     
-    return optimizer
+    adamw_optimizer = torch.optim.AdamW(
+        adamw_params,
+        lr=config.adamw_lr,
+        weight_decay=config.weight_decay,
+        betas=(0.9, 0.95),
+        eps=1e-8,
+    )
+    
+    # Return list of optimizers (like exp9)
+    return [muon_optimizer, adamw_optimizer]
 
 
-def get_lr_schedule(optimizer, config: MoEModelConfig, warmup_steps: int, total_steps: int):
-    """Create cosine learning rate schedule with warmup"""
+def get_lr_schedulers(optimizers, config: MoEModelConfig, warmup_steps: int, total_steps: int):
+    """Create cosine learning rate schedules with warmup for all optimizers"""
     import math
     
     def lr_lambda(step):
@@ -64,7 +68,7 @@ def get_lr_schedule(optimizer, config: MoEModelConfig, warmup_steps: int, total_
             progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
             return 0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * progress))
     
-    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    return [torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda) for opt in optimizers]
 
 
 def train_with_temperature_tracking(
@@ -97,11 +101,11 @@ def train_with_temperature_tracking(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     
-    # Setup optimizer and scheduler
-    optimizer = setup_optimizer(model, config)
+    # Setup optimizers and schedulers (hybrid Muon + AdamW)
+    optimizers = setup_optimizer(model, config)
     
     warmup_steps = int(config.warmup_ratio * config.max_steps)
-    scheduler = get_lr_schedule(optimizer, config, warmup_steps, config.max_steps)
+    schedulers = get_lr_schedulers(optimizers, config, warmup_steps, config.max_steps)
     
     # Use AMP for mixed precision training
     scaler = torch.cuda.amp.GradScaler(enabled=config.use_amp)
@@ -132,7 +136,8 @@ def train_with_temperature_tracking(
     model.train()
     accumulated_loss = 0.0
     accumulated_aux_loss = 0.0
-    optimizer.zero_grad()
+    for opt in optimizers:
+        opt.zero_grad()
     
     train_iter = iter(train_loader)
     
@@ -181,22 +186,27 @@ def train_with_temperature_tracking(
         
         # Update weights after accumulation steps
         if (step + 1) % config.gradient_accumulation_steps == 0:
-            scaler.unscale_(optimizer)
+            # Unscale, clip, and step all optimizers
+            for opt in optimizers:
+                scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
-            scaler.step(optimizer)
+            for opt in optimizers:
+                scaler.step(opt)
             scaler.update()
-            scheduler.step()
-            optimizer.zero_grad()
+            for sched in schedulers:
+                sched.step()
+            for opt in optimizers:
+                opt.zero_grad()
             global_step += 1
         
         # Evaluation
         if (step + 1) % config.eval_every == 0:
             elapsed_time = (time.time() - start_time) / 60
-            current_lr = scheduler.get_last_lr()[0]
+            current_lr = schedulers[0].get_last_lr()[0]  # Use Muon LR for logging
             
             # Evaluate on validation set
             model.eval()
-            val_metrics = evaluate_model(model, val_loader, device, config.eval_steps)
+            val_metrics = evaluate_model(model, val_loader, config)
             model.train()
             
             # Collect routing statistics from MoE layers
@@ -209,8 +219,8 @@ def train_with_temperature_tracking(
             logger.info(
                 f"Step {step+1}/{config.max_steps} | "
                 f"Train Loss: {avg_train_loss:.4f} | "
-                f"Val Loss: {val_metrics['loss']:.4f} | "
-                f"Val Acc: {val_metrics['accuracy']:.4f} | "
+                f"Val Loss: {val_metrics['val_loss']:.4f} | "
+                f"Val Acc: {val_metrics['val_accuracy']:.4f} | "
                 f"LR: {current_lr:.6f} | "
                 f"Temp: {current_temp:.2f} | "
                 f"Entropy: {routing_stats['avg_entropy']:.3f} | "
@@ -220,9 +230,9 @@ def train_with_temperature_tracking(
             # Update history
             history['steps'].append(step + 1)
             history['train_losses'].append(avg_train_loss)
-            history['val_losses'].append(val_metrics['loss'])
-            history['val_accuracies'].append(val_metrics['accuracy'])
-            history['val_perplexities'].append(val_metrics['perplexity'])
+            history['val_losses'].append(val_metrics['val_loss'])
+            history['val_accuracies'].append(val_metrics['val_accuracy'])
+            history['val_perplexities'].append(val_metrics['val_perplexity'])
             history['elapsed_times'].append(elapsed_time)
             history['learning_rates'].append(current_lr)
             history['temperatures'].append(current_temp)
@@ -237,12 +247,12 @@ def train_with_temperature_tracking(
     
     # Final evaluation
     model.eval()
-    final_metrics = evaluate_model(model, val_loader, device, config.eval_steps)
+    final_metrics = evaluate_model(model, val_loader, config)
     final_routing_stats = collect_routing_stats(model)
     
     logger.info(f"Training complete!")
-    logger.info(f"Final validation loss: {final_metrics['loss']:.4f}")
-    logger.info(f"Final validation accuracy: {final_metrics['accuracy']:.4f}")
+    logger.info(f"Final validation loss: {final_metrics['val_loss']:.4f}")
+    logger.info(f"Final validation accuracy: {final_metrics['val_accuracy']:.4f}")
     logger.info(f"Final routing entropy: {final_routing_stats['avg_entropy']:.3f}")
     
     return model, final_metrics, history, final_routing_stats
