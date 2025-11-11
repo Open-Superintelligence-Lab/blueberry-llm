@@ -491,6 +491,12 @@ warmup_ratio = 0.05
 - Faster convergence with 70x higher LR
 - Minimal computational overhead (NS steps add <10% time)
 
+### Integration Into Main Training Pipeline
+
+- Updated the shared MoE defaults in `configs/moe_config.py` to the Muon-optimal values (higher Muon LR, lower momentum, tuned AdamW leg, stronger weight decay, explicit 5% warmup ratio) and rewired `training/trainer.py` so both optimizers draw from those config fields.
+- Validated the change by running the main training script for 500 steps with the **old** and **new** defaults on the same cached dataset snapshot; artifacts live in `experiments/exp9_muon_vs_adam/main_script_eval/`.
+- The combined chart `baseline_vs_updated_comparison.png` overlays loss/accuracy/LR curves and shows the new defaults finishing at **val loss 5.20 / acc 0.255** versus **5.72 / 0.201** previously, with similar wall-clock time (~1.9 min).
+
 ### Future Work
 
 1. **Scale to larger models**: Test on 1B+ parameter models
