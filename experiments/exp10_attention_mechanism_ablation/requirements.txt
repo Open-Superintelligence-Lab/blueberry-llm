@@ -1,0 +1,16 @@
+# Experiment 10: Attention Mechanism Ablation Requirements
+
+# Core dependencies
+torch>=2.0.0
+transformers>=4.35.0
+datasets>=2.14.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+
+# Positional embeddings
+torchtune>=0.1.0
+
+# Linear attention (optional, only needed for linear attention mechanism)
+# Install with: pip install fla-flash-linear-attention
+# fla-flash-linear-attention>=0.1.0
+
