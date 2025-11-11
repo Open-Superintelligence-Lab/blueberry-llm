@@ -1,0 +1,16 @@
+{
+  "config": {
+    "muon_lr": 0.07,
+    "muon_momentum": 0.9,
+    "adamw_lr": 0.007,
+    "weight_decay": 0.2,
+    "max_steps": 500,
+    "warmup_ratio": 0.05
+  },
+  "metrics": {
+    "val_loss": 5.186366363238263,
+    "val_accuracy": 0.25647931878599134,
+    "val_perplexity": 178.81761275661268
+  },
+  "elapsed_minutes": 1.9736432115236917
+}

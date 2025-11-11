@@ -59,8 +59,12 @@ def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
     print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
-    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=0.95)
-    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.muon_lr*0.1, weight_decay=config.weight_decay)
+    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=config.muon_momentum)
+    adamw_optimizer = torch.optim.AdamW(
+        adamw_params,
+        lr=config.adamw_lr,
+        weight_decay=config.weight_decay
+    )
 
     return [muon_optimizer, adamw_optimizer]
 
@@ -409,8 +413,8 @@ def train_moe_model(config: MoEModelConfig, train_loader: DataLoader, val_loader
 
     # Learning rate schedule with cosine decay
     schedulers = []
+    warmup_steps = max(1, int(config.max_steps * config.warmup_ratio))
     for optimizer in optimizers:
-        warmup_steps = config.max_steps // 20
         def lr_lambda(step):
             if step < warmup_steps:
                 return step / warmup_steps
