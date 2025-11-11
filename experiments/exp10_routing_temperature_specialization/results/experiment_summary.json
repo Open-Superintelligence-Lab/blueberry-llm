@@ -1,0 +1,19 @@
+{
+  "experiments": [
+    "temp_0.5",
+    "temp_0.7",
+    "temp_1.0",
+    "temp_1.5",
+    "temp_2.0",
+    "temp_3.0",
+    "temp_5.0",
+    "temp_10.0",
+    "schedule_linear",
+    "schedule_cosine",
+    "schedule_exp",
+    "schedule_step",
+    "temp_best_long"
+  ],
+  "num_completed": 13,
+  "num_requested": 13
+}

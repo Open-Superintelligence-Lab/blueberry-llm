@@ -3,6 +3,7 @@ transformers
 torchtune
 torchao
 matplotlib
+seaborn
 # lm-eval
 
 # Single T4 GPU training

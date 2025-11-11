@@ -1,0 +1,104 @@
+{
+  "summary": {
+    "best_temperature": {
+      "experiment": "temp_0.7",
+      "temperature": 0.7,
+      "loss": 14.585194446172816
+    },
+    "most_balanced_experts": {
+      "experiment": "temp_2.0",
+      "gini_coefficient": 0.039511590395894025
+    }
+  },
+  "per_experiment": {
+    "temp_0.7": {
+      "temperature": 0.7,
+      "final_loss": 14.585194446172816,
+      "final_accuracy": 0.01640931313229101,
+      "expert_utilization": {
+        "distribution": [
+          0.1447695568203926,
+          0.12556708479921022,
+          0.11510686203837395,
+          0.12321331351995468,
+          0.10939040159185727,
+          0.13584287712971369,
+          0.12208833297093709,
+          0.12402133643627167
+        ],
+        "mean": 0.1249999706633389,
+        "std": 0.01038560616620274,
+        "min": 0.10939040159185727,
+        "max": 0.1447695568203926,
+        "gini": 0.045322315694041215
+      },
+      "routing_entropy": {
+        "initial": 0.0,
+        "final": 0.0,
+        "mean": 0.0,
+        "std": 0.0
+      }
+    },
+    "temp_1.0": {
+      "temperature": 1.0,
+      "final_loss": 14.623773783761283,
+      "final_accuracy": 0.01640931313229101,
+      "expert_utilization": {
+        "distribution": [
+          0.14738632986942926,
+          0.12114603569110234,
+          0.11430833364526431,
+          0.12586971869071326,
+          0.10711100200812022,
+          0.13220180943608284,
+          0.12949158623814583,
+          0.12248493855198224
+        ],
+        "mean": 0.12499996926635504,
+        "std": 0.011343782081391005,
+        "min": 0.10711100200812022,
+        "max": 0.14738632986942926,
+        "gini": 0.049977025508198825
+      },
+      "routing_entropy": {
+        "initial": 0.0,
+        "final": 0.0,
+        "mean": 0.0,
+        "std": 0.0
+      }
+    },
+    "temp_2.0": {
+      "temperature": 2.0,
+      "final_loss": 14.633379750875196,
+      "final_accuracy": 0.01640931313229101,
+      "expert_utilization": {
+        "distribution": [
+          0.13873382657766342,
+          0.12168020009994507,
+          0.12013104309638341,
+          0.12457200636466344,
+          0.1075517050921917,
+          0.130401990065972,
+          0.13411077360312143,
+          0.1228182278573513
+        ],
+        "mean": 0.12499997159466146,
+        "std": 0.008978584248845484,
+        "min": 0.1075517050921917,
+        "max": 0.13873382657766342,
+        "gini": 0.039511590395894025
+      },
+      "routing_entropy": {
+        "initial": 0.0,
+        "final": 0.0,
+        "mean": 0.0,
+        "std": 0.0
+      }
+    }
+  },
+  "insights": [
+    "Lower temperature (< 1.0) leads to sharper routing but may cause load imbalance",
+    "Higher temperature (> 1.0) improves load balancing but may reduce specialization",
+    "Optimal temperature balances exploration and exploitation"
+  ]
+}

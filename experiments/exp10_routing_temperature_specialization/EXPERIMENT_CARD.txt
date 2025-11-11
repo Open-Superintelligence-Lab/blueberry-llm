@@ -1,0 +1,163 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    EXPERIMENT 10: ROUTING TEMPERATURE                        ║
+║                     & EXPERT SPECIALIZATION ANALYSIS                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📋 OVERVIEW
+───────────
+Systematic exploration of routing temperature effects on MoE training:
+• How temperature affects convergence speed and final performance
+• Expert utilization and load balancing dynamics
+• Temperature scheduling strategies (exploration → exploitation)
+• Expert specialization patterns under different routing regimes
+
+🔬 RESEARCH QUESTIONS
+─────────────────────
+1. What is the optimal routing temperature for MoE training?
+2. Does temperature scheduling improve upon constant temperature?
+3. How does temperature affect expert specialization?
+4. Can we reduce load balancing loss through temperature tuning?
+
+🏗️  ARCHITECTURE
+────────────────
+Model:      MoE Transformer (classic attention)
+Experts:    8 experts, top-2 routing
+Size:       ~79M total params (~28.4% active)
+Dimensions: d_model=384, n_heads=8, n_layers=6, d_ff=1536
+
+⚙️  EXPERIMENTS
+───────────────
+Temperature Ablation (500 steps each):
+  • temp_0.5   - Very sharp routing (strong exploitation)
+  • temp_0.7   - Sharp routing
+  • temp_1.0   - Standard softmax (baseline)
+  • temp_1.5   - Slightly softer routing
+  • temp_2.0   - Softer routing (more exploration)
+  • temp_3.0   - Soft routing (high exploration)
+  • temp_5.0   - Very soft routing
+  • temp_10.0  - Nearly uniform routing
+
+Temperature Schedules (500 steps each):
+  • schedule_linear  - Linear decay from 5.0 → 1.0
+  • schedule_cosine  - Cosine decay from 5.0 → 1.0
+  • schedule_exp     - Exponential decay from 5.0 → 1.0
+  • schedule_step    - Step decay: 5.0→2.0→1.0
+
+Extended Training:
+  • temp_best_long   - Best temperature, 1000 steps
+
+📊 METRICS TRACKED
+──────────────────
+Performance:
+  • Validation loss, accuracy, perplexity
+  • Training time (wall-clock)
+
+Routing:
+  • Expert utilization distribution
+  • Load balancing loss
+  • Routing entropy (diversity measure)
+  • Expert selection confidence
+
+Specialization:
+  • Expert activation patterns
+  • Gini coefficient (utilization inequality)
+  • Utilization variance
+
+🚀 QUICK START
+──────────────
+# List all experiments
+python run_experiment.py --list
+
+# Run quick demo (3 temperatures)
+bash quick_demo.sh
+
+# Run full temperature ablation
+python run_experiment.py --ablation
+
+# Run temperature schedules
+python run_experiment.py --schedules
+
+# Run single temperature
+python run_experiment.py --experiment temp_2.0
+
+# Generate visualizations
+python plot_results.py --results-dir ./results --output-dir ./analysis
+python analyze_specialization.py --results-dir ./results --output-dir ./analysis
+
+📈 EXPECTED OUTCOMES
+────────────────────
+• Temperature ~1.5-2.0 likely optimal (based on theory)
+• Very low temperature (0.5) → load imbalance
+• Very high temperature (10.0) → insufficient specialization
+• Temperature scheduling should combine exploration + exploitation
+• Clear trade-off between load balancing and specialization
+
+🎯 KEY CONTRIBUTIONS
+────────────────────
+1. Optimal routing temperature for MoE training
+2. Temperature scheduling strategies
+3. Expert specialization dynamics under different routing regimes
+4. Load balancing effectiveness as function of temperature
+5. Comprehensive routing metrics and visualization toolkit
+
+📁 OUTPUT FILES
+───────────────
+Each experiment produces:
+  • results/{exp_name}/metrics.json        - Complete training history
+  • results/{exp_name}/model.pt            - Model checkpoint
+  • results/{exp_name}/logs/               - Training logs
+
+Analysis generates:
+  • analysis/temperature_ablation_comprehensive.png
+  • analysis/routing_dynamics.png
+  • analysis/expert_utilization.png
+  • analysis/expert_utilization_analysis.png
+  • analysis/entropy_analysis.png
+  • analysis/schedule_comparison.png
+  • analysis/summary_report.json
+  • analysis/specialization_report.json
+
+🔧 CONFIGURATION
+────────────────
+Optimizer:  Muon (hybrid) with optimal settings from exp9
+  • Muon LR:      0.07
+  • AdamW LR:     0.007
+  • Momentum:     0.9
+  • Weight decay: 0.2
+
+Training:
+  • Steps:        500 (1000 for extended)
+  • Batch size:   24
+  • Grad accum:   4
+  • LR schedule:  Cosine with 5% warmup
+  • Load bal:     0.01
+
+Dataset:    HuggingFaceTB/smollm-corpus (cosmopedia-v2)
+  • Train docs:   1,800
+  • Val docs:     200
+  • Seq length:   512 tokens
+
+💡 KEY INSIGHTS
+───────────────
+Temperature controls exploration-exploitation trade-off:
+  • Low temp (< 1.0):  Sharp routing, fast specialization, risk of imbalance
+  • Medium temp (1-2): Balanced routing, good for most cases
+  • High temp (> 2):   Exploratory routing, better load balance, slower convergence
+
+Scheduling strategy:
+  • Start high (exploration) to find good expert assignments
+  • Decay to lower values (exploitation) for final refinement
+  • Cosine/exponential schedules likely superior to linear
+
+📚 REFERENCES
+─────────────
+• Switch Transformers (Fedus+ 2021) - Load balancing in MoE
+• GShard (Lepikhin+ 2020) - Scaling MoE models
+• Expert Choice Routing (Zhou+ 2022) - Alternative routing
+• Soft MoE (Puigcerver+ 2023) - Soft expert assignments
+
+───────────────────────────────────────────────────────────────────────────────
+Created: November 11, 2025
+Branch:  exp10-routing-temperature-analysis
+───────────────────────────────────────────────────────────────────────────────
+
