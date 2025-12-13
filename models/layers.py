@@ -3,12 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchtune.modules import RotaryPositionalEmbeddings
 from .components import MixtureOfExperts
+from xformers.ops import memory_efficient_attention, LowerTriangularMask
 
 
 class Rotary(nn.Module):
     def __init__(self, dim: int, max_seq_len: int):
         super().__init__()
-        self.rope = RotaryPositionalEmbeddings(dim=dim, max_seq_len=max_seq_len, base=10000)
+        self.rope = RotaryPositionalEmbeddings(
+            dim=dim, max_seq_len=max_seq_len, base=10000
+        )
 
     def forward(self, x_BTHD: torch.Tensor):
         # x_BTHD shape: [B, T, H, D] - need to convert to [B, T, H, D] for torchtune
@@ -18,8 +21,16 @@ class Rotary(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(
+        self,
+        d_model: int,
+        n_heads: int,
+        max_seq_len: int,
+        dropout: float = 0.1,
+        use_mem_atten: bool = False,
+    ):
         super().__init__()
+        self.mem_atten = use_mem_atten
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_k = d_model // n_heads
@@ -37,18 +48,28 @@ class MultiHeadAttention(nn.Module):
 
         qkv = self.qkv(x).reshape(batch_size, seq_len, 3, self.n_heads, self.d_k)
         qkv = qkv.permute(2, 0, 3, 1, 4)
-        Q, K, V = qkv[0], qkv[1], qkv[2] # [B, H, T, D]
+        Q, K, V = qkv[0], qkv[1], qkv[2]  # [B, H, T, D]
 
         # Q = self.rotary(Q)
         # K = self.rotary(K)
         # Apply RoPE on [B, T, H, D]
         Q = self.rotary(Q.transpose(1, 2)).transpose(1, 2)
         K = self.rotary(K.transpose(1, 2)).transpose(1, 2)
-
-        attn_output = F.scaled_dot_product_attention(
-            Q, K, V, is_causal=True, dropout_p=self.dropout if self.training else 0.0
+        if self.mem_atten:
+            attn_output = memory_efficient_attention(
+                Q, K, V, attn_bias=LowerTriangularMask(), p=self.dropout
+            )
+        else:
+            attn_output = F.scaled_dot_product_attention(
+                Q,
+                K,
+                V,
+                is_causal=True,
+                dropout_p=self.dropout if self.training else 0.0,
+            )
+        attn_output = attn_output.transpose(1, 2).reshape(
+            batch_size, seq_len, self.d_model
         )
-        attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_len, self.d_model)
         # attn_output = attn_output.transpose(1, 2).reshape(B, T, self.d_model)
         return self.w_o(attn_output)
 
@@ -64,8 +85,10 @@ class MultiHeadLatentAttention(nn.Module):
         v_dim: int,
         max_seq_len: int,
         dropout: float = 0.1,
+        use_mem_atten: bool = False,
     ):
         super().__init__()
+        self.mem_atten = use_mem_atten
         self.d_model = d_model
         self.n_heads = n_heads
         self.qk_dim = qk_rope_dim + qk_nope_dim
@@ -107,9 +130,18 @@ class MultiHeadLatentAttention(nn.Module):
         k_nope, v = torch.split(kv, (self.qk_nope_dim, self.v_dim), dim=-1)
         k = torch.cat([k_nope, k_rope.expand(-1, -1, self.n_heads, -1)], dim=-1)
 
-        attn_output = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True, dropout_p=self.dropout if self.training else 0.0
-        )
+        if self.mem_atten:
+            attn_output = memory_efficient_attention(
+                q, k, v, attn_bias=LowerTriangularMask(), p=self.dropout
+            )
+        else:
+            attn_output = F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                is_causal=True,
+                dropout_p=self.dropout if self.training else 0.0,
+            )
         attn_output = (
             attn_output.transpose(1, 2).contiguous().view(batch_size, seq_len, -1)
         )
@@ -133,6 +165,7 @@ class MoETransformerBlock(nn.Module):
         num_experts: int = 8,
         top_k: int = 2,
         dropout: float = 0.1,
+        use_mem_atten: bool = False,
     ):
         super().__init__()
 
@@ -147,9 +180,12 @@ class MoETransformerBlock(nn.Module):
                 v_dim,
                 max_seq_len,
                 dropout,
+                use_mem_atten,
             )
         else:
-            self.attention = MultiHeadAttention(d_model, n_heads, max_seq_len, dropout)
+            self.attention = MultiHeadAttention(
+                d_model, n_heads, max_seq_len, dropout, use_mem_atten
+            )
 
         # MoE layer
         self.feed_forward = MixtureOfExperts(d_model, d_ff, num_experts, top_k, dropout)

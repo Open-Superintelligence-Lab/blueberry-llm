@@ -16,6 +16,7 @@ class MoEModelConfig:
     v_dim: int | None = 128
     batch_size: int = 24
     max_steps: int = 1000
+    use_mem_efficient_attention: bool = False
 
     # Training parameters
     gradient_accumulation_steps: int = 4
