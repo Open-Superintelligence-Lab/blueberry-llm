@@ -51,3 +51,32 @@ class MoEModelConfig:
     def __post_init__(self):
         self.d_k = self.d_model // self.n_heads
         assert self.d_model % self.n_heads == 0, "d_model must be divisible by n_heads"
+
+
+@dataclass
+class DebugMoEModelConfig(MoEModelConfig):
+    # Reduced architecture for debugging on 4090Consumer GPU
+    d_model: int = 512 // 2  # Very small
+    n_heads: int = 8
+    n_layers: int = 4
+    d_ff: int = 1024
+    
+    # MoE settings
+    num_experts: int = 4
+    expert_top_k: int = 2
+    
+    # Batch size
+    batch_size: int = 4
+    gradient_accumulation_steps: int = 4
+    
+    # Data
+    max_seq_len: int = 256
+    num_documents: int = 100
+    
+    # Reduced logging
+    log_milestones: Tuple[int, ...] = (50, 100)
+    max_steps: int = 100
+    eval_every: int = 10
+    
+    def __post_init__(self):
+        super().__post_init__()
