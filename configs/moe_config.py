@@ -5,23 +5,23 @@ from typing import Optional, Tuple
 @dataclass
 class MoEModelConfig:
     # Model architecture
-    d_model: int = 384
-    n_heads: int = 8
-    n_layers: int = 6
-    d_ff: int = 1536
+    d_model: int = 1536  # Updated for ~3B params
+    n_heads: int = 12  # Updated for ~3B params
+    n_layers: int = 26  # Updated for ~3B params
+    d_ff: int = 4096  # Updated for ~3B params (~2.67x d_model)
     use_mla: bool = False
     qk_rope_dim: int | None = 32
     qk_nope_dim: int | None = 128
     kv_lora_rank: int | None = 64
     v_dim: int | None = 128
-    batch_size: int = 24
-    max_steps: int = 1000
+    batch_size: int = 8  # Reduced for 3B model memory efficiency
+    max_steps: int = 10000  # Increased for better training
 
     # Training parameters
-    gradient_accumulation_steps: int = 4
-    muon_lr: float = 0.07
-    muon_momentum: float = 0.9
-    adamw_lr: float = 0.007
+    gradient_accumulation_steps: int = 12  # Increased to maintain effective batch size
+    muon_lr: float = 0.02  # Reduced for 3B model stability
+    muon_momentum: float = 0.95  # Slightly increased for larger model
+    adamw_lr: float = 0.003  # Reduced for 3B model stability
     warmup_ratio: float = 0.05
 
     # Data parameters

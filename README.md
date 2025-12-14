@@ -1,4 +1,4 @@
-# Blueberry LLM
+# Looking for a name for this LLM
 
 **Open Superintelligence Lab** - Open research for everyone. We publish all of our research for the sake of accelerating science. Learn real AI research from a real research lab.
 
