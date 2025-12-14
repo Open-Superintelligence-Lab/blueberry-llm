@@ -74,4 +74,4 @@ This project implements a **~3 billion parameter Mixture of Experts (MoE)** tran
 
 ## Contributing
 
-See `CONTRIBUTING.md` for guidelines on how to contribute to this project.
+See `CONTRIBUTING.md` for guidelines on how to contribute to this project
