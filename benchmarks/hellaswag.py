@@ -32,8 +32,16 @@ def compute_perplexity(model, tokenizer, text, device='cuda'):
     
     with torch.no_grad():
         with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
-            outputs = model(input_ids, labels=input_ids)
-            loss = outputs.loss
+            # Model does not accept labels or return loss object, so we compute it manually
+            logits = model(input_ids, return_aux_loss=False)
+            
+            # Shift so that tokens < n predict n
+            shift_logits = logits[..., :-1, :].contiguous()
+            shift_labels = input_ids[..., 1:].contiguous()
+            
+            # Compute loss
+            loss_fct = torch.nn.CrossEntropyLoss()
+            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             perplexity = torch.exp(loss).item()
     
     return perplexity
@@ -86,7 +94,7 @@ def evaluate_hellaswag(model, tokenizer, split='validation', max_samples=None, d
             'endings': sample['endings'],
             'predicted_idx': int(predicted_idx),
             'correct_idx': correct_idx,
-            'is_correct': is_correct,
+            'is_correct': bool(is_correct),
             'perplexities': [float(p) for p in perplexities],
         })
     
