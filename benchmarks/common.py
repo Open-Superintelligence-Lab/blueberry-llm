@@ -49,6 +49,12 @@ def load_model_from_checkpoint(checkpoint_path, device='cuda', dtype=torch.bfloa
         print("Warning: Config not found in checkpoint, using default MoEModelConfig")
         config = MoEModelConfig()
 
+    # Ensure max_seq_len is large enough for benchmarks
+    # RoPE can handle extrapolation/longer sequences to some extent, but cache must be initialized
+    if hasattr(config, 'max_seq_len') and config.max_seq_len < 2048:
+        print(f"Adjusting max_seq_len from {config.max_seq_len} to 2048 for evaluation")
+        config.max_seq_len = 2048
+
     # Create model
     # Note: the config object should already have the right parameters
     model = MoEMinimalLLM(config)
