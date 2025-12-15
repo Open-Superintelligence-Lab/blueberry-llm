@@ -66,11 +66,11 @@ class Gpu24GBMoEModelConfig(MoEModelConfig):
     expert_top_k: int = 2
     
     # Batch size
-    batch_size: int = 4
-    gradient_accumulation_steps: int = 2
+    batch_size: int = 12
+    gradient_accumulation_steps: int = 1
     
     # Data
-    max_seq_len: int = 512
+    max_seq_len: int = 1024
     num_documents: int = 1000
     
     # Reduced logging

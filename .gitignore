@@ -215,3 +215,10 @@ __marimo__/
 
 # Cache
 data_cache/
+# Processed data cache
+processed_data/
+*.arrow
+# We probably want to ignore most json files generated in data processing, but keep config/results
+# For now, following user request strictly to ignore json
+*.json
+!benchmark_comparison_results.json

@@ -43,39 +43,54 @@ def main():
         cache_dir="./hf_cache",
     )
 
-    # Split documents BEFORE tokenization to prevent data leakage
-    from datasets import load_dataset
-    print("Loading raw dataset and splitting documents...")
-    raw_dataset = load_dataset(
-        data_cfg.dataset_path,
-        data_cfg.dataset_name,
-        split=data_cfg.split,
-        cache_dir=data_cfg.cache_dir,
-        streaming=True,
-    )
-    
-    # Take samples and split into train/val
-    raw_samples = list(raw_dataset.take(data_cfg.num_samples))
-    num_val = int(len(raw_samples) * 0.1)
-    num_train = len(raw_samples) - num_val
-    
-    from datasets import Dataset
-    raw_train = Dataset.from_list(raw_samples[:num_train])
-    raw_val = Dataset.from_list(raw_samples[num_train:])
-    logger.info(f"Split into {len(raw_train):,} train docs and {len(raw_val):,} val docs")
-    
-    # Now tokenize each split separately
     from data.loader import setup_tokenizer, tokenize_and_chunk, finalize_dataset
+    from datasets import load_from_disk, load_dataset, Dataset
+    
+    # Setup tokenizer first to get vocab size
     tokenizer = setup_tokenizer(data_cfg)
     config.vocab_size = tokenizer.vocab_size
-    
-    print("Tokenizing train set...")
-    train_ds = tokenize_and_chunk(raw_train, tokenizer, data_cfg)
-    train_ds = finalize_dataset(train_ds, data_cfg)
-    
-    print("Tokenizing validation set...")
-    val_ds = tokenize_and_chunk(raw_val, tokenizer, data_cfg)
-    val_ds = finalize_dataset(val_ds, data_cfg)
+
+    # Define cache paths
+    cache_dir = "./processed_data"
+    train_cache = os.path.join(cache_dir, "train")
+    val_cache = os.path.join(cache_dir, "val")
+
+    if os.path.exists(train_cache) and os.path.exists(val_cache):
+        print(f"Loading cached datasets from {cache_dir}...")
+        train_ds = load_from_disk(train_cache)
+        val_ds = load_from_disk(val_cache)
+    else:
+        # Split documents BEFORE tokenization to prevent data leakage
+        print("Loading raw dataset and splitting documents...")
+        raw_dataset = load_dataset(
+            data_cfg.dataset_path,
+            data_cfg.dataset_name,
+            split=data_cfg.split,
+            cache_dir=data_cfg.cache_dir,
+            streaming=True,
+        )
+        
+        # Take samples and split into train/val
+        raw_samples = list(raw_dataset.take(data_cfg.num_samples))
+        num_val = int(len(raw_samples) * 0.1)
+        num_train = len(raw_samples) - num_val
+        
+        raw_train = Dataset.from_list(raw_samples[:num_train])
+        raw_val = Dataset.from_list(raw_samples[num_train:])
+        logger.info(f"Split into {len(raw_train):,} train docs and {len(raw_val):,} val docs")
+        
+        # Now tokenize each split separately
+        print("Tokenizing train set...")
+        train_ds = tokenize_and_chunk(raw_train, tokenizer, data_cfg)
+        # Save train split
+        data_cfg.save_to_disk = train_cache
+        train_ds = finalize_dataset(train_ds, data_cfg)
+        
+        print("Tokenizing validation set...")
+        val_ds = tokenize_and_chunk(raw_val, tokenizer, data_cfg)
+        # Save val split
+        data_cfg.save_to_disk = val_cache
+        val_ds = finalize_dataset(val_ds, data_cfg)
     
     logger.info(f"Train sequences: {len(train_ds):,}, Val sequences: {len(val_ds):,}")
 
