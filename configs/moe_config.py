@@ -56,21 +56,21 @@ class MoEModelConfig:
 @dataclass
 class Gpu24GBMoEModelConfig(MoEModelConfig):
     # Reduced architecture for debugging on 4090 (24GB VRAM)
-    d_model: int = 1024
-    n_heads: int = 16
-    n_layers: int = 16
-    d_ff: int = 4096
+    d_model: int = 512
+    n_heads: int = 8
+    n_layers: int = 8
+    d_ff: int = 2048
     
     # MoE settings
     num_experts: int = 8
     expert_top_k: int = 2
     
     # Batch size
-    batch_size: int = 8
-    gradient_accumulation_steps: int = 8
+    batch_size: int = 4
+    gradient_accumulation_steps: int = 2
     
     # Data
-    max_seq_len: int = 1024
+    max_seq_len: int = 512
     num_documents: int = 1000
     
     # Reduced logging
