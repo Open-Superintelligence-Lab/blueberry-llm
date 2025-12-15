@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 # Fix tokenizer parallelism warning when using DataLoader workers
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from configs.moe_config import MoEModelConfig, DebugMoEModelConfig
+from configs.moe_config import MoEModelConfig, Gpu24GBMoEModelConfig
 from configs.dataset_config import DataConfig
 from training.trainer import train_moe_model
 from utils.helpers import set_seed
@@ -29,9 +29,9 @@ def main():
 
     print_system_info()
     set_seed(42)
-    # For H100 uncomment MoEModelConfig, for small GPU uncomment DebugMoEModelConfig
+    # For H100 uncomment MoEModelConfig, for small GPU uncomment Gpu24GBMoEModelConfig
     # config = MoEModelConfig()
-    config = DebugMoEModelConfig()
+    config = Gpu24GBMoEModelConfig()
 
     print("Loading dataset with Hugging Face Datasets API...")
     data_cfg = DataConfig(

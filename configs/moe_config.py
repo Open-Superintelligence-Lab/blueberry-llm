@@ -54,7 +54,7 @@ class MoEModelConfig:
 
 
 @dataclass
-class DebugMoEModelConfig(MoEModelConfig):
+class Gpu24GBMoEModelConfig(MoEModelConfig):
     # Reduced architecture for debugging on 4090 (24GB VRAM)
     d_model: int = 1024
     n_heads: int = 16

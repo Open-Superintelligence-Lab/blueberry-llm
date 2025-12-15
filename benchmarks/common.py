@@ -12,7 +12,7 @@ sys.path.insert(0, str(root_dir))
 sys.path.append(str(root_dir))
 
 from models.moe_llm import MoEMinimalLLM
-from configs.moe_config import MoEModelConfig, DebugMoEModelConfig
+from configs.moe_config import MoEModelConfig, Gpu24GBMoEModelConfig
 
 def load_model_from_checkpoint(checkpoint_path, device='cuda', dtype=torch.bfloat16):
     """
@@ -35,7 +35,7 @@ def load_model_from_checkpoint(checkpoint_path, device='cuda', dtype=torch.bfloa
     
     # Load checkpoint
     # Safe globals to allow loading custom config class
-    torch.serialization.add_safe_globals([MoEModelConfig, DebugMoEModelConfig])
+    torch.serialization.add_safe_globals([MoEModelConfig, Gpu24GBMoEModelConfig])
     
     try:
         checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
