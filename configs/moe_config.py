@@ -55,28 +55,28 @@ class MoEModelConfig:
 
 @dataclass
 class DebugMoEModelConfig(MoEModelConfig):
-    # Reduced architecture for debugging on 4090Consumer GPU
-    d_model: int = 512 // 2  # Very small
-    n_heads: int = 8
-    n_layers: int = 4
-    d_ff: int = 1024
+    # Reduced architecture for debugging on 4090 (24GB VRAM)
+    d_model: int = 1024
+    n_heads: int = 16
+    n_layers: int = 16
+    d_ff: int = 4096
     
     # MoE settings
-    num_experts: int = 4
+    num_experts: int = 8
     expert_top_k: int = 2
     
     # Batch size
-    batch_size: int = 4
-    gradient_accumulation_steps: int = 4
+    batch_size: int = 8
+    gradient_accumulation_steps: int = 8
     
     # Data
-    max_seq_len: int = 256
-    num_documents: int = 100
+    max_seq_len: int = 1024
+    num_documents: int = 1000
     
     # Reduced logging
-    log_milestones: Tuple[int, ...] = (50, 100)
-    max_steps: int = 100
-    eval_every: int = 10
+    log_milestones: Tuple[int, ...] = (100, 200, 300)
+    max_steps: int = 500
+    eval_every: int = 50
     
     def __post_init__(self):
         super().__post_init__()
