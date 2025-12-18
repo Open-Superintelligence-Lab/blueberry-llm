@@ -1,7 +1,11 @@
 import time
+import os
 import torch
 import logging
 from torch.utils.data import DataLoader
+
+# Fix tokenizer parallelism warning when using DataLoader workers
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from configs.moe_config import MoEModelConfig
 from configs.dataset_config import DataConfig
@@ -38,12 +42,40 @@ def main():
         cache_dir="./hf_cache",
     )
 
-    dataset, tokenizer = prepare_lm_dataset(data_cfg)
+    # Split documents BEFORE tokenization to prevent data leakage
+    from datasets import load_dataset
+    print("Loading raw dataset and splitting documents...")
+    raw_dataset = load_dataset(
+        data_cfg.dataset_path,
+        data_cfg.dataset_name,
+        split=data_cfg.split,
+        cache_dir=data_cfg.cache_dir,
+        streaming=True,
+    )
+    
+    # Take samples and split into train/val
+    raw_samples = list(raw_dataset.take(data_cfg.num_samples))
+    num_val = int(len(raw_samples) * 0.1)
+    num_train = len(raw_samples) - num_val
+    
+    from datasets import Dataset
+    raw_train = Dataset.from_list(raw_samples[:num_train])
+    raw_val = Dataset.from_list(raw_samples[num_train:])
+    logger.info(f"Split into {len(raw_train):,} train docs and {len(raw_val):,} val docs")
+    
+    # Now tokenize each split separately
+    from data.loader import setup_tokenizer, tokenize_and_chunk, finalize_dataset
+    tokenizer = setup_tokenizer(data_cfg)
     config.vocab_size = tokenizer.vocab_size
-    logger.info(f"Loaded dataset with {len(dataset):,} sequences")
-
-    splits = dataset.train_test_split(test_size=0.1, seed=42)
-    train_ds, val_ds = splits["train"], splits["test"]
+    
+    print("Tokenizing train set...")
+    train_ds = tokenize_and_chunk(raw_train, tokenizer, data_cfg)
+    train_ds = finalize_dataset(train_ds, data_cfg)
+    
+    print("Tokenizing validation set...")
+    val_ds = tokenize_and_chunk(raw_val, tokenizer, data_cfg)
+    val_ds = finalize_dataset(val_ds, data_cfg)
+    
     logger.info(f"Train sequences: {len(train_ds):,}, Val sequences: {len(val_ds):,}")
 
     loader_args = dict(
@@ -81,6 +113,7 @@ def main():
     logger.info(f"Final metrics: {metrics}")
 
     ckpt_path = "./checkpoints/final_model.pt"
+    os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
     torch.save(
         {"model_state_dict": model.state_dict(),
          "config": config,

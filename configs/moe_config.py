@@ -9,14 +9,20 @@ class MoEModelConfig:
     n_heads: int = 8
     n_layers: int = 6
     d_ff: int = 1536
+    use_mla: bool = False
+    qk_rope_dim: int | None = 32
+    qk_nope_dim: int | None = 128
+    kv_lora_rank: int | None = 64
+    v_dim: int | None = 128
     batch_size: int = 24
-    max_steps: int = 20
+    max_steps: int = 1000
 
     # Training parameters
     gradient_accumulation_steps: int = 4
-    muon_lr: float = 0.01
-    muon_momentum: float = 0.95
-    adamw_lr: float = 0.001
+    muon_lr: float = 0.07
+    muon_momentum: float = 0.9
+    adamw_lr: float = 0.007
+    warmup_ratio: float = 0.05
 
     # Data parameters
     max_seq_len: int = 512
@@ -28,7 +34,7 @@ class MoEModelConfig:
     eval_steps: int = 100
 
     # Regularization
-    weight_decay: float = 0.1
+    weight_decay: float = 0.2
     dropout: float = 0.1
     grad_clip: float = 1.0
 

@@ -1,0 +1,440 @@
+"""
+Enhanced trainer with experiment configuration support
+"""
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+import time
+import json
+import sys
+import matplotlib.pyplot as plt
+from pathlib import Path
+from torch.utils.data import DataLoader
+from torch.amp import autocast, GradScaler
+from tqdm import tqdm
+
+# Add paths
+script_dir = Path(__file__).resolve().parent.parent
+project_root = script_dir.parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(script_dir))
+
+from configs.moe_config import MoEModelConfig
+from exp_configs.experiment_configs import ExperimentConfig
+from models.moe_llm import MoEMinimalLLM
+from optimizers.muon import Muon
+from training.evaluation import evaluate_model
+from utils.helpers import set_seed
+
+
+class EarlyStopping:
+    """Early stopping handler"""
+    def __init__(self, patience: int = 30, min_delta: float = 0.001):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss = float('inf')
+        self.counter = 0
+        self.best_step = 0
+        
+    def __call__(self, val_loss: float, step: int) -> bool:
+        """Returns True if training should stop"""
+        if val_loss < self.best_loss - self.min_delta:
+            self.best_loss = val_loss
+            self.best_step = step
+            self.counter = 0
+            return False
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                print(f"\n⏹️  Early stopping triggered at step {step}")
+                print(f"   Best loss: {self.best_loss:.4f} at step {self.best_step}")
+                return True
+            return False
+
+
+def get_lr_scheduler(optimizer, config: MoEModelConfig, exp_config: ExperimentConfig):
+    """Create learning rate scheduler based on experiment config"""
+    if not exp_config.use_lr_schedule or exp_config.lr_schedule_type == "constant":
+        # Constant LR - no scheduling
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step: 1.0)
+    
+    warmup_steps = int(config.max_steps * exp_config.warmup_steps_ratio)
+    min_lr_ratio = exp_config.min_lr_ratio
+    
+    if exp_config.lr_schedule_type == "cosine":
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return step / warmup_steps
+            else:
+                progress = (step - warmup_steps) / (config.max_steps - warmup_steps)
+                return min_lr_ratio + (1 - min_lr_ratio) * 0.5 * (1 + math.cos(math.pi * progress))
+    
+    elif exp_config.lr_schedule_type == "linear_decay":
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return step / warmup_steps
+            else:
+                progress = (step - warmup_steps) / (config.max_steps - warmup_steps)
+                return min_lr_ratio + (1 - min_lr_ratio) * (1 - progress)
+    
+    elif exp_config.lr_schedule_type == "step":
+        # Step decay: reduce by 0.5 every 25% of training
+        step_size = config.max_steps // 4
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return step / warmup_steps
+            else:
+                return 0.5 ** ((step - warmup_steps) // step_size)
+    
+    else:
+        raise ValueError(f"Unknown lr_schedule_type: {exp_config.lr_schedule_type}")
+    
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+
+def setup_muon_optimizer(model: nn.Module, config: MoEModelConfig):
+    """Setup Muon optimizer with hybrid approach"""
+    muon_params = []
+    adamw_params = []
+
+    for name, param in model.named_parameters():
+        if (param.ndim == 2 and 
+            'token_embedding' not in name and 
+            'norm' not in name and 
+            param.requires_grad):
+            muon_params.append(param)
+        else:
+            adamw_params.append(param)
+
+    print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
+    print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
+
+    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=0.95)
+    adamw_optimizer = torch.optim.AdamW(adamw_params, lr=config.muon_lr*0.1, weight_decay=config.weight_decay)
+
+    return [muon_optimizer, adamw_optimizer]
+
+
+def train_experiment(
+    config: MoEModelConfig,
+    exp_config: ExperimentConfig,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    output_dir: str = "./experiments"
+):
+    """Train model with experiment configuration"""
+    
+    # Create output directory
+    output_path = Path(output_dir) / exp_config.name
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    print(f"\n{'='*80}")
+    print(f"🧪 Running Experiment: {exp_config.name}")
+    print(f"{'='*80}")
+    print(f"Description: {exp_config.description}")
+    print(f"Output: {output_path}")
+    print(f"{'='*80}\n")
+    
+    # Initialize model
+    set_seed(42)
+    model = MoEMinimalLLM(config)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
+
+    # Count parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    active_params = sum(p.numel() for n, p in model.named_parameters()
+                       if 'expert' not in n)
+    expert_params = total_params - active_params
+
+    print(f"  📊 Total parameters: {total_params:,}")
+    print(f"  📊 Active parameters: {active_params:,}")
+    print(f"  📊 Expert parameters: {expert_params:,}")
+    print(f"  📊 Parameter efficiency: {active_params/total_params:.1%} active per forward pass")
+
+    # Setup optimizers
+    optimizers = setup_muon_optimizer(model, config)
+
+    # Setup learning rate schedulers
+    schedulers = [get_lr_scheduler(opt, config, exp_config) for opt in optimizers]
+    
+    # Early stopping
+    early_stopper = None
+    if exp_config.use_early_stopping:
+        early_stopper = EarlyStopping(
+            patience=exp_config.early_stopping_patience,
+            min_delta=exp_config.early_stopping_min_delta
+        )
+        print(f"  🛑 Early stopping enabled: patience={exp_config.early_stopping_patience}")
+
+    scaler = GradScaler() if config.use_amp else None
+
+    # Training metrics tracking
+    train_start_time = time.time()
+    metrics_history = {
+        'steps': [],
+        'val_losses': [],
+        'val_accuracies': [],
+        'val_perplexities': [],
+        'elapsed_times': [],
+        'learning_rates': [],
+    }
+
+    # Training loop
+    model.train()
+    step = 0
+    pbar = tqdm(total=config.max_steps, desc=f"Training {exp_config.name}")
+    
+    stopped_early = False
+
+    while step < config.max_steps:
+        for batch_idx, batch in enumerate(train_loader):
+            if step >= config.max_steps:
+                break
+
+            if isinstance(batch, dict):
+                x = batch["input_ids"]
+                y = batch["labels"]
+                attention_mask = batch.get("attention_mask")
+            elif isinstance(batch, (list, tuple)):
+                if len(batch) == 3:
+                    x, attention_mask, y = batch
+                elif len(batch) == 2:
+                    x, y = batch
+                    attention_mask = None
+                else:
+                    raise ValueError(f"Unexpected batch structure with {len(batch)} elements.")
+            else:
+                raise TypeError(f"Unsupported batch type: {type(batch)}")
+
+            x, y = x.to(device), y.to(device)
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(device)
+
+            # Forward pass
+            if config.use_amp:
+                with autocast('cuda', dtype=torch.float16):
+                    logits, aux_loss = model(x, return_aux_loss=True)
+                    shift_logits = logits[:, :-1, :].contiguous()
+                    shift_labels = y[:, 1:].contiguous()
+                    ce_loss = F.cross_entropy(
+                        shift_logits.view(-1, config.vocab_size),
+                        shift_labels.view(-1)
+                    )
+
+                    total_loss = ce_loss
+                    if aux_loss is not None:
+                        total_loss = total_loss + aux_loss
+
+                    loss = total_loss / config.gradient_accumulation_steps
+                scaler.scale(loss).backward()
+            else:
+                logits, aux_loss = model(x, return_aux_loss=True)
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = y[:, 1:].contiguous()
+                ce_loss = F.cross_entropy(
+                    shift_logits.view(-1, config.vocab_size),
+                    shift_labels.view(-1)
+                )
+
+                total_loss = ce_loss
+                if aux_loss is not None:
+                    total_loss = total_loss + aux_loss
+
+                loss = total_loss / config.gradient_accumulation_steps
+                loss.backward()
+
+            # Optimizer step
+            if (step + 1) % config.gradient_accumulation_steps == 0:
+                if config.use_amp:
+                    for optimizer in optimizers:
+                        scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+
+                    for optimizer in optimizers:
+                        scaler.step(optimizer)
+                        optimizer.zero_grad()
+                    for scheduler in schedulers:
+                        scheduler.step()
+                    scaler.update()
+                else:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                    for optimizer in optimizers:
+                        optimizer.step()
+                        optimizer.zero_grad()
+                    for scheduler in schedulers:
+                        scheduler.step()
+
+            # Logging
+            if step % 100 == 0:
+                with torch.no_grad():
+                    predictions = logits.argmax(dim=-1)
+                    accuracy = (predictions == y).float().mean().item()
+                    current_loss = ce_loss.item()
+                    perplexity = math.exp(min(current_loss, 20))
+                    current_lr = schedulers[0].get_last_lr()[0]
+
+                pbar.set_postfix({
+                    'loss': f'{current_loss:.4f}',
+                    'aux': f'{aux_loss.item() if aux_loss is not None else 0:.4f}',
+                    'acc': f'{accuracy:.3f}',
+                    'ppl': f'{perplexity:.1f}',
+                    'lr': f'{current_lr:.5f}'
+                })
+
+            # Evaluation
+            if step % config.eval_every == 0 and step > 0:
+                eval_metrics = evaluate_model(model, val_loader, config)
+                elapsed_time = (time.time() - train_start_time) / 60
+                
+                # Track metrics
+                metrics_history['steps'].append(step)
+                metrics_history['val_losses'].append(eval_metrics['val_loss'])
+                metrics_history['val_accuracies'].append(eval_metrics['val_accuracy'])
+                metrics_history['val_perplexities'].append(eval_metrics['val_perplexity'])
+                metrics_history['elapsed_times'].append(elapsed_time)
+                metrics_history['learning_rates'].append(schedulers[0].get_last_lr()[0])
+                
+                print(f"\nStep {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
+                      f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
+                      f"Val PPL: {eval_metrics['val_perplexity']:.2f}, "
+                      f"LR: {schedulers[0].get_last_lr()[0]:.5f}")
+                
+                # Early stopping check
+                if early_stopper is not None:
+                    if early_stopper(eval_metrics['val_loss'], step):
+                        stopped_early = True
+                        break
+
+            step += 1
+            if step % 20 == 0:
+                pbar.update(20)
+        
+        if stopped_early:
+            break
+
+    pbar.close()
+
+    # Final evaluation (if not stopped early)
+    if not stopped_early or step == config.max_steps:
+        final_eval = evaluate_model(model, val_loader, config)
+        elapsed_time = (time.time() - train_start_time) / 60
+        
+        metrics_history['steps'].append(step)
+        metrics_history['val_losses'].append(final_eval['val_loss'])
+        metrics_history['val_accuracies'].append(final_eval['val_accuracy'])
+        metrics_history['val_perplexities'].append(final_eval['val_perplexity'])
+        metrics_history['elapsed_times'].append(elapsed_time)
+        metrics_history['learning_rates'].append(schedulers[0].get_last_lr()[0])
+    else:
+        # Use best metrics if stopped early
+        best_idx = metrics_history['val_losses'].index(min(metrics_history['val_losses']))
+        final_eval = {
+            'val_loss': metrics_history['val_losses'][best_idx],
+            'val_accuracy': metrics_history['val_accuracies'][best_idx],
+            'val_perplexity': metrics_history['val_perplexities'][best_idx],
+        }
+    
+    total_time = (time.time() - train_start_time) / 60
+    
+    print(f"\n📊 Final Results:")
+    print(f"   Val Loss: {final_eval['val_loss']:.4f}")
+    print(f"   Val Accuracy: {final_eval['val_accuracy']:.4f}")
+    print(f"   Val Perplexity: {final_eval['val_perplexity']:.2f}")
+    print(f"   Total Time: {total_time:.2f} min")
+    if stopped_early:
+        print(f"   ⚠️  Training stopped early at step {step}")
+    
+    # Save metrics
+    metrics_file = output_path / "metrics.json"
+    with open(metrics_file, 'w') as f:
+        json.dump({
+            'experiment_config': {
+                'name': exp_config.name,
+                'description': exp_config.description,
+                'max_steps': exp_config.max_steps,
+                'lr_schedule_type': exp_config.lr_schedule_type,
+                'use_early_stopping': exp_config.use_early_stopping,
+                'load_balancing_weight': exp_config.load_balancing_weight,
+                'dropout': exp_config.dropout,
+            },
+            'final_metrics': final_eval,
+            'total_time_minutes': total_time,
+            'stopped_early': stopped_early,
+            'actual_steps': step,
+            'history': metrics_history,
+        }, f, indent=2)
+    print(f"   📁 Metrics saved to {metrics_file}")
+    
+    # Plot metrics
+    plot_experiment_metrics(metrics_history, exp_config, output_path)
+    
+    # Save model checkpoint
+    checkpoint_path = output_path / "model.pt"
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'config': config,
+        'exp_config': exp_config,
+        'metrics': final_eval,
+        'step': step,
+    }, checkpoint_path)
+    print(f"   💾 Model saved to {checkpoint_path}")
+    
+    return model, final_eval, metrics_history
+
+
+def plot_experiment_metrics(metrics_history, exp_config: ExperimentConfig, output_path: Path):
+    """Plot and save experiment metrics"""
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle(f'Experiment: {exp_config.name}', fontsize=14, fontweight='bold')
+    
+    # Plot 1: Val Loss vs Time
+    ax = axes[0, 0]
+    ax.plot(metrics_history['elapsed_times'], metrics_history['val_losses'], 'b-o', linewidth=2, markersize=4)
+    ax.set_xlabel('Time (minutes)')
+    ax.set_ylabel('Validation Loss')
+    ax.set_title('Validation Loss vs Time')
+    ax.grid(True, alpha=0.3)
+    
+    # Highlight best point
+    best_idx = metrics_history['val_losses'].index(min(metrics_history['val_losses']))
+    ax.plot(metrics_history['elapsed_times'][best_idx], 
+            metrics_history['val_losses'][best_idx], 
+            'r*', markersize=15, label=f'Best: {metrics_history["val_losses"][best_idx]:.4f}')
+    ax.legend()
+    
+    # Plot 2: Val Loss vs Steps
+    ax = axes[0, 1]
+    ax.plot(metrics_history['steps'], metrics_history['val_losses'], 'g-o', linewidth=2, markersize=4)
+    ax.set_xlabel('Training Steps')
+    ax.set_ylabel('Validation Loss')
+    ax.set_title('Validation Loss vs Steps')
+    ax.grid(True, alpha=0.3)
+    ax.plot(metrics_history['steps'][best_idx], 
+            metrics_history['val_losses'][best_idx], 
+            'r*', markersize=15)
+    
+    # Plot 3: Val Accuracy vs Steps
+    ax = axes[1, 0]
+    ax.plot(metrics_history['steps'], metrics_history['val_accuracies'], 'purple', linewidth=2, marker='o', markersize=4)
+    ax.set_xlabel('Training Steps')
+    ax.set_ylabel('Validation Accuracy')
+    ax.set_title('Validation Accuracy vs Steps')
+    ax.grid(True, alpha=0.3)
+    
+    # Plot 4: Learning Rate vs Steps
+    ax = axes[1, 1]
+    ax.plot(metrics_history['steps'], metrics_history['learning_rates'], 'orange', linewidth=2)
+    ax.set_xlabel('Training Steps')
+    ax.set_ylabel('Learning Rate')
+    ax.set_title('Learning Rate Schedule')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plot_path = output_path / "metrics_plot.png"
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"   📊 Plots saved to {plot_path}")
+

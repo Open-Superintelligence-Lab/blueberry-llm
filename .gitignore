@@ -6,11 +6,13 @@ __pycache__/
 # C extensions
 *.so
 
+**/.DS_Store
+
 # Distribution / packaging
 .Python
 build/
 develop-eggs/
-dist/
+dist/   
 downloads/
 eggs/
 .eggs/
@@ -64,6 +66,8 @@ db.sqlite3-journal
 # Flask stuff:
 instance/
 .webassets-cache
+
+hf_cache/
 
 # Scrapy stuff:
 .scrapy

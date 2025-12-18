@@ -1,0 +1,173 @@
+================================================================================
+                    EXPERIMENT: exp8_baseline_cosine_lr_lb0.01
+================================================================================
+
+STATUS: ✅ Completed
+DATE: 2025-11-09
+TYPE: Baseline Reference
+
+DESCRIPTION
+-----------
+Baseline 1000-step training run with cosine LR schedule and load balancing 
+weight 0.01. This experiment captures the validation loss inflection issue 
+that motivated the systematic testing framework.
+
+CONFIGURATION
+-------------
+Model Architecture:
+  - 8 experts, top-2 routing
+  - d_model: 384, n_heads: 8, n_layers: 6
+  - d_ff: 1536
+  - Total params: 79M (28.4% active per forward)
+
+Training Setup:
+  - Steps: 1000
+  - Batch size: 24
+  - Gradient accumulation: 4
+  - Learning rate: Cosine schedule with warmup
+  - Load balancing weight: 0.01
+  - Dropout: 0.1
+  - Weight decay: 0.1
+
+RESULTS
+-------
+Final Metrics (step 1000):
+  ✓ Validation loss: 5.1564
+  ✓ Validation accuracy: 25.19%
+  ✓ Validation perplexity: 173.53
+  ✓ Training time: 3.83 minutes
+
+Best Metrics:
+  ★ Best validation loss: 5.1357
+  ★ Achieved at step: 950
+  ★ Accuracy at best: 25.20%
+
+KEY FINDING: VALIDATION LOSS INFLECTION
+----------------------------------------
+⚠️  ISSUE DETECTED at steps 850-1000
+
+Timeline:
+  Steps 1-850:   Smooth improvement
+  Steps 850-950: Loss plateaus, reaches best at 950
+  Steps 950-1000: Loss INCREASES by 0.4%
+
+Analysis:
+  • Best loss: 5.1357 @ step 950
+  • Final loss: 5.1564 @ step 1000
+  • Degradation: +0.0207 (+0.4%)
+  
+Potential Causes:
+  1. OVERFITTING: Model memorizing training data
+  2. LR SCHEDULE: Cosine decay dropping LR too low
+  3. LOAD BALANCING: Auxiliary loss conflicting with main objective
+
+DATASET
+-------
+  - Source: HuggingFaceTB/smollm-corpus (cosmopedia-v2)
+  - Training docs: 1,800
+  - Validation docs: 200
+  - Sequence length: 512 tokens
+  - Train sequences: 2,521
+  - Val sequences: 279
+
+FILES IN THIS DIRECTORY
+-----------------------
+Results:
+  metrics.json          (8.9 KB)  - Complete training history & config
+  metrics_plot.png      (419 KB)  - 4-panel visualization with inflection marked
+  val_loss_vs_time.png  (115 KB)  - Original loss curve over time
+
+Code (Experiment Framework):
+  run_experiments.py              - Main experiment runner
+  view_experiments.py             - Results viewer and analyzer
+  configs/experiment_configs.py   - 9 experiment configurations
+  training/experiment_trainer.py  - Enhanced trainer with early stopping, LR schedules
+
+Documentation:
+  README.md             (1.6 KB)  - Detailed experiment summary
+  EXPERIMENT_CARD.txt   (this)    - Quick reference card
+  EXPERIMENTS_INDEX.md            - Index of all experiments
+
+VISUALIZATIONS
+--------------
+metrics_plot.png contains 4 panels:
+  1. Validation Loss vs Time
+     - Shows smooth curve until ~3.5 min mark
+     - Red star marks best loss, inflection visible
+  
+  2. Validation Loss vs Steps  
+     - Red shaded region (850-1000) highlights inflection
+     - Clear visualization of loss increase after step 950
+  
+  3. Validation Accuracy vs Steps
+     - Continues improving even during loss inflection
+     - Suggests overfitting (memorization without generalization)
+  
+  4. Validation Perplexity vs Steps (log scale)
+     - Mirrors loss behavior
+     - Shows plateau and slight increase at end
+
+NEXT EXPERIMENTS TO RUN
+------------------------
+To diagnose this issue, run:
+
+1. exp9_early_stopping
+   → Test if stopping at best val loss prevents degradation
+   → Confirms overfitting hypothesis
+
+2. exp10_lower_lb_weight (0.001) or exp11_no_lb (0.0)
+   → Test if load balancing is interfering
+   → Lower or remove auxiliary loss
+
+3. exp12_constant_lr or exp15_slower_min_lr
+   → Test if LR schedule is too aggressive
+   → Keep LR from dropping too low
+
+4. exp13_higher_dropout (0.2)
+   → Test if more regularization helps
+   → Reduces overfitting
+
+5. exp16_short_run (600 steps)
+   → Test when issue first appears
+   → Helps understand timing
+
+USAGE COMMANDS
+--------------
+View this experiment:
+  $ cd experiments/exp8_baseline_cosine_lr_lb0.01
+  $ python view_experiments.py
+
+Run comparison experiments:
+  $ python run_experiments.py -e early_stopping lower_lb_weight
+  $ python view_experiments.py
+
+List available experiments:
+  $ python run_experiments.py --list
+
+Parse metrics programmatically:
+  >>> import json
+  >>> with open('metrics.json') as f:
+  >>>     data = json.load(f)
+  >>> best_loss = min(data['history']['val_losses'])
+  >>> print(f"Best: {best_loss:.4f} at step {data['history']['steps'][data['history']['val_losses'].index(best_loss)]}")
+
+REPRODUCTION
+------------
+To reproduce this experiment:
+  $ python train_moe.py
+
+The current train_moe.py is configured for 1000 steps with these settings.
+
+NOTES
+-----
+- This experiment established the baseline and identified the problem
+- All future experiments are compared against this baseline
+- The inflection is reproducible and consistent
+- Model still trains successfully despite the issue
+- Issue doesn't break training but suggests suboptimal configuration
+
+================================================================================
+Experiment organized: 2025-11-09 18:45 UTC
+Framework version: blueberry-llm experiments v1.0
+================================================================================
+
